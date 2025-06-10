@@ -5,7 +5,7 @@ function log_message {
 
 log_message "Setting up Go environment"
 export PATH="$(go env GOPATH)/bin:$PATH"
-go env -w GOPRIVATE=bitbucket.org/edgewater/fixview
+go env -w GOPRIVATE=bitbucket.org/edgewater/fixdecoder
 
 go mod tidy
 go mod download
