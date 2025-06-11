@@ -96,4 +96,4 @@ func supportedFixVersions() string {
 }
 EOF
 
-echo "Done. Generated packages: ${schemaVers[*]} and chooseFixVersion.go." ${schemaVers[*]} " and chooseFixVersion.go."
+echo "Done. Generated packages: ${schemaVers[*]} and chooseFixVersion.go."
