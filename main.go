@@ -76,7 +76,7 @@ type CLIOptions struct {
 // parseFlags parses command-line flags into CLIOptions.
 func parseFlags() CLIOptions {
 	xmlPath := flag.String("xml", "", "Path to alternative FIX XML file")
-	fixVersion := flag.String("fix", "44", "FIX version to use (40,41,42,43,44,50)")
+	fixVersion := flag.String("fix", "44", "FIX version to use ("+supportedFixVersions()+")")
 	var component componentFlag
 	var tag tagFlag
 	verbose := flag.Bool("verbose", false, "Show full message structure with enums")
@@ -135,7 +135,8 @@ func handleInfo(opts CLIOptions, schema SchemaTree) bool {
 		return false
 	}
 
-	fmt.Println("Schema summary:")
+	fmt.Printf("Available FIX Dictionaries: %s\n", supportedFixVersions())
+	fmt.Printf("Current Schema:\n")
 	fmt.Printf("  FIX Version:  %s\n", schema.Version)
 	fmt.Printf("  Service Pack: %s\n", schema.ServicePack)
 	fmt.Printf("  Messages:     %d\n", len(schema.Messages))
