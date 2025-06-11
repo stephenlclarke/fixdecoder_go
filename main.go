@@ -21,7 +21,7 @@ import (
 var (
 	Version = "0.0.0"
 	Branch  = "main"
-	GitUrl  = "git@bitbucket.org:edgewater/fixdecoder.git"
+	GitUrl  = "git@bitbucket.org:edgewater/fixview.git"
 	Sha     = "0000000"
 )
 
@@ -91,11 +91,11 @@ func parseFlags() CLIOptions {
 
 // printUsage prints the program usage.
 func printUsage() {
-	fmt.Printf("fixdecoder %s (branch:%s, commit:%s)\n\n", Version, Branch, Sha)
+	fmt.Printf("fixview %s (branch:%s, commit:%s)\n\n", Version, Branch, Sha)
 	fmt.Printf("  git clone %s\n\n", GitUrl)
 	fmt.Println("Usage: go run main.go [[-fix=44] | [-xml FIX44.xml]] [-message[=MSG] [-verbose] [-column] [-header] [-trailer]]")
 	fmt.Println("       go run main.go [[-fix=44] | [-xml FIX44.xml]] [-tag[=TAG] [-verbose] [-column]]")
-	fmt.Println("       go run main.go [[-fix=44] | [-xml FIX44.xml]] [-component= <name> [-verbose]]")
+	fmt.Println("       go run main.go [[-fix=44] | [-xml FIX44.xml]] [-component <name> [-verbose]]")
 	fmt.Println("       go run main.go [[-fix=44] | [-xml FIX44.xml]] [-info]")
 }
 
@@ -187,38 +187,15 @@ func handleTag(opts CLIOptions, schema SchemaTree) bool {
 }
 
 // handleComponent processes the -component flag. Returns true if handled.
-// handleComponent processes the -component flag. Returns true if handled.
 func handleComponent(opts CLIOptions, schema SchemaTree) bool {
-	// detect if -component was provided at all
-	compSet := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "component" {
-			compSet = true
-		}
-	})
-	if !compSet {
-		// flag not supplied
+	if opts.ComponentName == "" {
 		return false
 	}
 
-	// if user passed -component= (no value), list all component names
-	if opts.ComponentName == "" {
-		names := make([]string, 0, len(schema.Components))
-		for name := range schema.Components {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			fmt.Fprintln(os.Stdout, name)
-		}
-		return true
-	}
-
-	// otherwise, handle a specific component name as before
 	if comp, ok := schema.Components[opts.ComponentName]; ok {
 		displayComponent(schema, comp, opts.Verbose, opts.ColumnOutput, 0)
 	} else {
-		fmt.Fprintf(os.Stdout, "Component not found: %s\n", opts.ComponentName)
+		fmt.Printf("Component not found: %s\n", opts.ComponentName)
 	}
 	return true
 }
