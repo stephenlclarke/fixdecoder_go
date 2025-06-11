@@ -11,7 +11,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 URL_BASE="https://raw.githubusercontent.com/quickfix/quickfix/master/spec"
-VERSIONS=(40 41 42 43 44 50)
+VERSIONS=("40" "41" "42" "43" "44" "50" "50SP1" "50SP2" "T11")
 
 # Create resources directory for XML files
 mkdir -p resources
