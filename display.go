@@ -20,7 +20,7 @@ func listAllTags(schema SchemaTree) {
 
 	sort.Slice(fields, func(i, j int) bool { return fields[i].Number < fields[j].Number })
 	for _, field := range fields {
-		fmt.Printf("%d: %s (%s)\n", field.Number, field.Name, field.Type)
+		fmt.Printf("%4d: %s (%s)\n", field.Number, field.Name, field.Type)
 	}
 }
 
@@ -45,7 +45,7 @@ func listAllMessages(schema SchemaTree) {
 
 	sort.Slice(msgs, func(i, j int) bool { return msgs[i].MsgType < msgs[j].MsgType })
 	for _, m := range msgs {
-		fmt.Printf("%s: %s (%s)\n", m.MsgType, m.Name, m.MsgCat)
+		fmt.Printf("%2s: %s (%s)\n", m.MsgType, m.Name, m.MsgCat)
 	}
 }
 
@@ -139,7 +139,7 @@ func printHeader(schema SchemaTree, includeHeader, verbose, column bool, indent 
 
 func printField(field FieldNode, indent int) {
 	printIndent(indent)
-	fmt.Printf("%d: %s (%s)%s\n",
+	fmt.Printf("%4d: %s (%s)%s\n",
 		field.Field.Number, field.Field.Name, field.Field.Type, formatRequired(field.Ref.Required),
 	)
 }
