@@ -1,0 +1,57 @@
+image: golang:1.23
+
+definitions:
+  caches:
+    go: go
+
+  steps:
+    - step: &security_scan
+        name: Security Scan
+        script:
+          # Run a security scan for sensitive data
+          - pipe: atlassian/git-secrets-scan:3.1.0
+            variables:
+              DEBUG: "true"
+              CREATE_REPORT: "true"
+              GITLEAKS_COMMAND: "dir"
+              GITLEAKS_EXTRA_ARGS:
+                - "-v"
+                - "--config=gitleaks-config.toml"
+
+    - step: &build_test
+        name: Build, Test & Coverage
+        caches:
+          - go
+        script:
+          - ./build.sh
+        artifacts:
+          - coverage.out
+          - coverage.integration.out
+          - test_report.xml
+
+    - step: &sonar_analysis
+        name: SonarCloud Analysis
+        artifacts:
+          - coverage.out
+          - coverage.integration.out
+          - test_report.xml
+        caches:
+          - go
+        script:
+          - pipe: sonarsource/sonarcloud-scan:3.1.0
+            variables:
+              SONAR_TOKEN: $SONAR_TOKEN
+          - pipe: sonarsource/sonarcloud-quality-gate:0.2.0
+            variables:
+              SONAR_TOKEN: $SONAR_TOKEN
+
+pipelines:
+  default:
+    - step: *security_scan
+    - step: *build_test
+
+  branches:
+    '{main,master,develop}':
+      - step: *security_scan
+      - step: *build_test
+      - step: *sonar_analysis
