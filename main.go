@@ -9,16 +9,6 @@ import (
 	"os"
 	"sort"
 	"strconv"
-
-	"bitbucket.org/edgewater/fixdecoder/fix40"
-	"bitbucket.org/edgewater/fixdecoder/fix41"
-	"bitbucket.org/edgewater/fixdecoder/fix42"
-	"bitbucket.org/edgewater/fixdecoder/fix43"
-	"bitbucket.org/edgewater/fixdecoder/fix44"
-	"bitbucket.org/edgewater/fixdecoder/fix50"
-	"bitbucket.org/edgewater/fixdecoder/fix50SP1"
-	"bitbucket.org/edgewater/fixdecoder/fix50SP2"
-	"bitbucket.org/edgewater/fixdecoder/fixT11"
 )
 
 // tagFlag supports optional string arg; bare -tag lists all, explicit -tag= shows usage, and -tag=NN selects a tag.
@@ -146,11 +136,11 @@ func handleInfo(opts CLIOptions, schema SchemaTree) bool {
 	}
 
 	fmt.Println("Schema summary:")
-	fmt.Printf("  FIX Version: %s\n", schema.Version)
+	fmt.Printf("  FIX Version:  %s\n", schema.Version)
 	fmt.Printf("  Service Pack: %s\n", schema.ServicePack)
-	fmt.Printf("  Messages:    %d\n", len(schema.Messages))
-	fmt.Printf("  Components:  %d\n", len(schema.Components))
-	fmt.Printf("  Fields:      %d\n", len(schema.Fields))
+	fmt.Printf("  Messages:     %d\n", len(schema.Messages))
+	fmt.Printf("  Components:   %d\n", len(schema.Components))
+	fmt.Printf("  Fields:       %d\n", len(schema.Fields))
 	return true
 }
 
@@ -165,7 +155,7 @@ func handleMessage(opts CLIOptions, schema SchemaTree) bool {
 			// Collect messages in a slice for column output
 			msgs := make([]string, 0, len(schema.Messages))
 			for _, m := range schema.Messages {
-				var msg = fmt.Sprintf("%s: %s (%s)", m.MsgType, m.Name, m.MsgCat)
+				var msg = fmt.Sprintf("%2s: %s (%s)", m.MsgType, m.Name, m.MsgCat)
 				msgs = append(msgs, msg)
 			}
 
@@ -200,12 +190,19 @@ func handleTag(opts CLIOptions, schema SchemaTree) bool {
 	switch opts.Tag.value {
 	case "true": // bare -tag
 		if opts.ColumnOutput {
-			nums := make([]string, 0, len(schema.Fields))
+			// Sort fields by numeric tag before formatting and printing
+			fs := make([]Field, 0, len(schema.Fields))
 			for _, f := range schema.Fields {
-				nums = append(nums, strconv.Itoa(f.Number))
+				fs = append(fs, f)
 			}
-			sort.Strings(nums)
-			printStringColumns(nums)
+			sort.Slice(fs, func(i, j int) bool {
+				return fs[i].Number < fs[j].Number
+			})
+			lines := make([]string, len(fs))
+			for i, f := range fs {
+				lines[i] = fmt.Sprintf("%3d: %s (%s)", f.Number, f.Name, f.Type)
+			}
+			printStringColumns(lines)
 		} else {
 			listAllTags(schema)
 		}
@@ -288,32 +285,6 @@ func loadSchemaFromOpts(opts CLIOptions) (SchemaTree, error) {
 	}
 
 	return loadSchema(opts.XMLPath)
-}
-
-// chooseEmbeddedXML returns the raw XML constant for a given FIX version.
-func chooseEmbeddedXML(ver string) string {
-	switch ver {
-	case "40":
-		return fix40.FIX40XML
-	case "41":
-		return fix41.FIX41XML
-	case "42":
-		return fix42.FIX42XML
-	case "43":
-		return fix43.FIX43XML
-	case "44":
-		return fix44.FIX44XML
-	case "50":
-		return fix50.FIX50XML
-	case "50SP1":
-		return fix50SP1.FIX50SP1XML
-	case "50SP2":
-		return fix50SP2.FIX50SP2XML
-	case "T11":
-		return fixT11.FIXT11XML
-	default:
-		return fix44.FIX44XML
-	}
 }
 
 // runHandlers invokes each of your "-info", "-message", "-tag", and "-component" handlers.
