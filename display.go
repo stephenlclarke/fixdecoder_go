@@ -2,20 +2,14 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
+
 	"strings"
 
 	"golang.org/x/term"
 )
-
-// isTagSet returns true if the -tag flag was provided.
-func isTagSet() bool {
-	return flag.Lookup("tag").Value.String() != ""
-}
 
 // listAllTags prints every tag number, name, and type.
 func listAllTags(schema SchemaTree) {
@@ -30,9 +24,29 @@ func listAllTags(schema SchemaTree) {
 	}
 }
 
-// parseTagID converts a raw string to an integer tag ID.
-func parseTagID(raw string) (int, error) {
-	return strconv.Atoi(raw)
+// listAllComponents prints all component names in sorted order.
+func listAllComponents(schema SchemaTree) {
+	names := make([]string, 0, len(schema.Components))
+	for name := range schema.Components {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		fmt.Println(n)
+	}
+}
+
+// listAllMessages prints all messages in sorted order by MsgType.
+func listAllMessages(schema SchemaTree) {
+	var msgs []MessageNode
+	for _, m := range schema.Messages {
+		msgs = append(msgs, m)
+	}
+
+	sort.Slice(msgs, func(i, j int) bool { return msgs[i].MsgType < msgs[j].MsgType })
+	for _, m := range msgs {
+		fmt.Printf("%s: %s (%s)\n", m.MsgType, m.Name, m.MsgCat)
+	}
 }
 
 // findField returns the Field with the given number, or false if not found.
@@ -128,6 +142,34 @@ func printField(field FieldNode, indent int) {
 	fmt.Printf("%d: %s (%s)%s\n",
 		field.Field.Number, field.Field.Name, field.Field.Type, formatRequired(field.Ref.Required),
 	)
+}
+
+// printStringColumns prints a slice of strings in columns based on terminal width.
+func printStringColumns(items []string) {
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		width = 80
+	}
+	maxLen := 0
+	for _, s := range items {
+		if len(s) > maxLen {
+			maxLen = len(s)
+		}
+	}
+	cols := width / (maxLen + 2)
+	if cols == 0 {
+		cols = 1
+	}
+	rows := (len(items) + cols - 1) / cols
+	for r := range make([]int, rows) {
+		for c := range make([]int, cols) {
+			i := c*rows + r
+			if i < len(items) {
+				fmt.Printf("%-*s", maxLen+2, items[i])
+			}
+		}
+		fmt.Println()
+	}
 }
 
 // printFields prints all the simple fields of the message.

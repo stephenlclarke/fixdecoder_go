@@ -6,14 +6,15 @@ import (
 )
 
 type FixDictionary struct {
-	XMLName    xml.Name    `xml:"fix"`
-	Major      string      `xml:"major,attr"`
-	Minor      string      `xml:"minor,attr"`
-	Fields     []Field     `xml:"fields>field"`
-	Messages   []Message   `xml:"messages>message"`
-	Components []Component `xml:"components>component"`
-	Header     Component   `xml:"header"`
-	Trailer    Component   `xml:"trailer"`
+	XMLName     xml.Name    `xml:"fix"`
+	Major       string      `xml:"major,attr"`
+	Minor       string      `xml:"minor,attr"`
+	ServicePack string      `xml:"servicepack,attr"`
+	Fields      []Field     `xml:"fields>field"`
+	Messages    []Message   `xml:"messages>message"`
+	Components  []Component `xml:"components>component"`
+	Header      Component   `xml:"header"`
+	Trailer     Component   `xml:"trailer"`
 }
 
 type Field struct {
@@ -92,10 +93,11 @@ type MessageNode struct {
 }
 
 type SchemaTree struct {
-	Fields     map[string]Field
-	Messages   map[string]MessageNode
-	Components map[string]ComponentNode
-	Version    string
+	Fields      map[string]Field
+	Messages    map[string]MessageNode
+	Components  map[string]ComponentNode
+	Version     string
+	ServicePack string
 }
 
 func buildSchema(dict FixDictionary) SchemaTree {

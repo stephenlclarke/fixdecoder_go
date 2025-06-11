@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 
 	"bitbucket.org/edgewater/fixdecoder/fix40"
 	"bitbucket.org/edgewater/fixdecoder/fix41"
@@ -15,7 +16,30 @@ import (
 	"bitbucket.org/edgewater/fixdecoder/fix43"
 	"bitbucket.org/edgewater/fixdecoder/fix44"
 	"bitbucket.org/edgewater/fixdecoder/fix50"
+	"bitbucket.org/edgewater/fixdecoder/fix50SP1"
+	"bitbucket.org/edgewater/fixdecoder/fix50SP2"
+	"bitbucket.org/edgewater/fixdecoder/fixT11"
 )
+
+// tagFlag supports optional string arg; bare -tag lists all, explicit -tag= shows usage, and -tag=NN selects a tag.
+type tagFlag struct {
+	value string
+	isSet bool
+}
+
+func (t *tagFlag) String() string     { return t.value }
+func (t *tagFlag) Set(s string) error { t.value, t.isSet = s, true; return nil }
+func (t *tagFlag) IsBoolFlag() bool   { return true }
+
+// componentFlag supports optional string arg; bare -component lists all, explicit -component= shows usage, and -component=NAME selects it.
+type componentFlag struct {
+	value string
+	isSet bool
+}
+
+func (c *componentFlag) String() string     { return c.value }
+func (c *componentFlag) Set(s string) error { c.value, c.isSet = s, true; return nil }
+func (c *componentFlag) IsBoolFlag() bool   { return true }
 
 // Version, Branch, GitUrl, Sha are injected at build time via -ldflags
 var (
@@ -49,13 +73,13 @@ func (m *messageFlag) IsBoolFlag() bool {
 type CLIOptions struct {
 	XMLPath        string
 	FixVersion     string
-	ComponentName  string
+	Component      componentFlag
 	Verbose        bool
 	IncludeHeader  bool
 	IncludeTrailer bool
 	ColumnOutput   bool
 	Message        messageFlag
-	TagRaw         string
+	Tag            tagFlag
 	Info           bool
 }
 
@@ -63,14 +87,16 @@ type CLIOptions struct {
 func parseFlags() CLIOptions {
 	xmlPath := flag.String("xml", "", "Path to alternative FIX XML file")
 	fixVersion := flag.String("fix", "44", "FIX version to use (40,41,42,43,44,50)")
-	componentName := flag.String("component", "", "Show the structure of the specified component")
+	var component componentFlag
+	var tag tagFlag
 	verbose := flag.Bool("verbose", false, "Show full message structure with enums")
 	includeHeader := flag.Bool("header", false, "Include Header block")
 	includeTrailer := flag.Bool("trailer", false, "Include Trailer block")
 	var message messageFlag
 	flag.Var(&message, "message", "Message ID to display details for (omit value to list all messages)")
+	flag.Var(&component, "component", "Component to display (omit to list all components)")
+	flag.Var(&tag, "tag", "Tag number to display details for (omit to list all tags)")
 	columnOutput := flag.Bool("column", false, "Display enums in columns")
-	tagRaw := flag.String("tag", "", "Tag number to display details for (omit value to list all tags)")
 	info := flag.Bool("info", false, "Show XML schema summary (fields, components, messages, version counts)")
 
 	flag.Parse()
@@ -78,13 +104,13 @@ func parseFlags() CLIOptions {
 	return CLIOptions{
 		XMLPath:        *xmlPath,
 		FixVersion:     *fixVersion,
-		ComponentName:  *componentName,
+		Component:      component,
 		Verbose:        *verbose,
 		IncludeHeader:  *includeHeader,
 		IncludeTrailer: *includeTrailer,
 		ColumnOutput:   *columnOutput,
 		Message:        message,
-		TagRaw:         *tagRaw,
+		Tag:            tag,
 		Info:           *info,
 	}
 }
@@ -121,6 +147,7 @@ func handleInfo(opts CLIOptions, schema SchemaTree) bool {
 
 	fmt.Println("Schema summary:")
 	fmt.Printf("  FIX Version: %s\n", schema.Version)
+	fmt.Printf("  Service Pack: %s\n", schema.ServicePack)
 	fmt.Printf("  Messages:    %d\n", len(schema.Messages))
 	fmt.Printf("  Components:  %d\n", len(schema.Components))
 	fmt.Printf("  Fields:      %d\n", len(schema.Fields))
@@ -132,70 +159,100 @@ func handleMessage(opts CLIOptions, schema SchemaTree) bool {
 	if !opts.Message.isSet {
 		return false
 	}
+	switch opts.Message.value {
+	case "true": // bare -message
+		if opts.ColumnOutput {
+			// Collect messages in a slice for column output
+			msgs := make([]string, 0, len(schema.Messages))
+			for _, m := range schema.Messages {
+				var msg = fmt.Sprintf("%s: %s (%s)", m.MsgType, m.Name, m.MsgCat)
+				msgs = append(msgs, msg)
+			}
 
-	// list all messages
-	if opts.Message.value == "" || opts.Message.value == "true" {
-		var msgs []MessageNode
+			sort.Strings(msgs)
+			printStringColumns(msgs)
+		} else {
+			listAllMessages(schema)
+		}
+
+	case "": // explicit -message=
+		printUsage()
+	default:
+		// specific message
 		for _, m := range schema.Messages {
-			msgs = append(msgs, m)
+			if m.Name == opts.Message.value || m.MsgType == opts.Message.value {
+				displayMessageStructureWithOptions(schema, m, opts.Verbose, opts.IncludeHeader, opts.IncludeTrailer, opts.ColumnOutput, 2)
+				return true
+			}
 		}
 
-		sort.Slice(msgs, func(i, j int) bool { return msgs[i].MsgType < msgs[j].MsgType })
-		for _, m := range msgs {
-			fmt.Printf("%s: %s (%s)\n", m.MsgType, m.Name, m.MsgCat)
-		}
+		fmt.Printf("Message not found: %s\n", opts.Message.value)
 		return true
 	}
-
-	// specific message
-	for _, m := range schema.Messages {
-		if m.Name == opts.Message.value || m.MsgType == opts.Message.value {
-			displayMessageStructureWithOptions(schema, m, opts.Verbose, opts.IncludeHeader, opts.IncludeTrailer, opts.ColumnOutput, 2)
-			return true
-		}
-	}
-
-	fmt.Printf("Message not found: %s\n", opts.Message.value)
 	return true
 }
 
 // handleTag processes the -tag flag. Returns true if handled.
 func handleTag(opts CLIOptions, schema SchemaTree) bool {
-	if !isTagSet() {
+	if !opts.Tag.isSet {
 		return false
 	}
-
-	if opts.TagRaw == "" {
-		listAllTags(schema)
-		return true
+	switch opts.Tag.value {
+	case "true": // bare -tag
+		if opts.ColumnOutput {
+			nums := make([]string, 0, len(schema.Fields))
+			for _, f := range schema.Fields {
+				nums = append(nums, strconv.Itoa(f.Number))
+			}
+			sort.Strings(nums)
+			printStringColumns(nums)
+		} else {
+			listAllTags(schema)
+		}
+	case "": // explicit -tag=
+		printUsage()
+	default:
+		id, err := strconv.Atoi(opts.Tag.value)
+		if err != nil {
+			fmt.Printf("Invalid tag: %s\n", opts.Tag.value)
+		} else {
+			field, found := findField(schema, id)
+			if !found {
+				fmt.Printf("Tag not found: %d\n", id)
+			} else {
+				printTagDetails(field, opts.Verbose, opts.ColumnOutput)
+			}
+		}
 	}
-
-	tagID, err := parseTagID(opts.TagRaw)
-	if err != nil {
-		fmt.Printf("Invalid tag: %s\n", opts.TagRaw)
-		return true
-	}
-
-	field, found := findField(schema, tagID)
-	if !found {
-		fmt.Printf("Tag not found: %d\n", tagID)
-		return true
-	}
-
-	printTagDetails(field, opts.Verbose, opts.ColumnOutput)
 	return true
 }
 
 // handleComponent processes the -component flag. Returns true if handled.
 func handleComponent(opts CLIOptions, schema SchemaTree) bool {
-	if opts.ComponentName == "" {
+	if !opts.Component.isSet {
 		return false
 	}
-
-	if comp, ok := schema.Components[opts.ComponentName]; ok {
-		displayComponent(schema, comp, opts.Verbose, opts.ColumnOutput, 0)
-	} else {
-		fmt.Printf("Component not found: %s\n", opts.ComponentName)
+	switch opts.Component.value {
+	case "true": // bare -component
+		if opts.ColumnOutput {
+			names := make([]string, 0, len(schema.Components))
+			for name := range schema.Components {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			printStringColumns(names)
+		} else {
+			listAllComponents(schema)
+		}
+	case "": // explicit -component=
+		printUsage()
+	default:
+		name := opts.Component.value
+		if comp, ok := schema.Components[name]; ok {
+			displayComponent(schema, comp, opts.Verbose, opts.ColumnOutput, 0)
+		} else {
+			fmt.Printf("Component not found: %s\n", name)
+		}
 	}
 	return true
 }
@@ -248,6 +305,12 @@ func chooseEmbeddedXML(ver string) string {
 		return fix44.FIX44XML
 	case "50":
 		return fix50.FIX50XML
+	case "50SP1":
+		return fix50SP1.FIX50SP1XML
+	case "50SP2":
+		return fix50SP2.FIX50SP2XML
+	case "T11":
+		return fixT11.FIXT11XML
 	default:
 		return fix44.FIX44XML
 	}
