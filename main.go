@@ -188,41 +188,58 @@ func handleTag(opts CLIOptions, schema SchemaTree) bool {
 	if !opts.Tag.isSet {
 		return false
 	}
+
 	switch opts.Tag.value {
 	case "true": // bare -tag
-		if opts.ColumnOutput {
-			// Sort fields by numeric tag before formatting and printing
-			fs := make([]Field, 0, len(schema.Fields))
-			for _, f := range schema.Fields {
-				fs = append(fs, f)
-			}
-			sort.Slice(fs, func(i, j int) bool {
-				return fs[i].Number < fs[j].Number
-			})
-			lines := make([]string, len(fs))
-			for i, f := range fs {
-				lines[i] = fmt.Sprintf("%3d: %s (%s)", f.Number, f.Name, f.Type)
-			}
-			printStringColumns(lines)
-		} else {
-			listAllTags(schema)
-		}
+		handleBareTag(opts, schema)
 	case "": // explicit -tag=
 		printUsage()
 	default:
-		id, err := strconv.Atoi(opts.Tag.value)
-		if err != nil {
-			fmt.Printf("Invalid tag: %s\n", opts.Tag.value)
-		} else {
-			field, found := findField(schema, id)
-			if !found {
-				fmt.Printf("Tag not found: %d\n", id)
-			} else {
-				printTagDetails(field, opts.Verbose, opts.ColumnOutput)
-			}
-		}
+		handleSpecificTag(opts, schema)
 	}
 	return true
+}
+
+func handleBareTag(opts CLIOptions, schema SchemaTree) {
+	if opts.ColumnOutput {
+		printTagsInColumns(schema)
+	} else {
+		listAllTags(schema)
+	}
+}
+
+func handleSpecificTag(opts CLIOptions, schema SchemaTree) {
+	id, err := strconv.Atoi(opts.Tag.value)
+	if err != nil {
+		fmt.Printf("Invalid tag: %s\n", opts.Tag.value)
+		return
+	}
+
+	field, found := findField(schema, id)
+	if !found {
+		fmt.Printf("Tag not found: %d\n", id)
+		return
+	}
+
+	printTagDetails(field, opts.Verbose, opts.ColumnOutput)
+}
+
+func printTagsInColumns(schema SchemaTree) {
+	fs := make([]Field, 0, len(schema.Fields))
+	for _, f := range schema.Fields {
+		fs = append(fs, f)
+	}
+
+	sort.Slice(fs, func(i, j int) bool {
+		return fs[i].Number < fs[j].Number
+	})
+
+	lines := make([]string, len(fs))
+	for i, f := range fs {
+		lines[i] = fmt.Sprintf("%4d: %s (%s)", f.Number, f.Name, f.Type)
+	}
+
+	printStringColumns(lines)
 }
 
 // handleComponent processes the -component flag. Returns true if handled.
@@ -230,29 +247,39 @@ func handleComponent(opts CLIOptions, schema SchemaTree) bool {
 	if !opts.Component.isSet {
 		return false
 	}
+
 	switch opts.Component.value {
 	case "true": // bare -component
-		if opts.ColumnOutput {
-			names := make([]string, 0, len(schema.Components))
-			for name := range schema.Components {
-				names = append(names, name)
-			}
-			sort.Strings(names)
-			printStringColumns(names)
-		} else {
-			listAllComponents(schema)
-		}
+		handleBareComponent(opts, schema)
 	case "": // explicit -component=
 		printUsage()
 	default:
-		name := opts.Component.value
-		if comp, ok := schema.Components[name]; ok {
-			displayComponent(schema, comp, opts.Verbose, opts.ColumnOutput, 0)
-		} else {
-			fmt.Printf("Component not found: %s\n", name)
-		}
+		handleSpecificComponent(opts, schema)
 	}
 	return true
+}
+
+func handleBareComponent(opts CLIOptions, schema SchemaTree) {
+	if opts.ColumnOutput {
+		names := make([]string, 0, len(schema.Components))
+		for name := range schema.Components {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		printStringColumns(names)
+	} else {
+		listAllComponents(schema)
+	}
+}
+
+func handleSpecificComponent(opts CLIOptions, schema SchemaTree) {
+	name := opts.Component.value
+
+	if comp, ok := schema.Components[name]; ok {
+		displayComponent(schema, comp, opts.Verbose, opts.ColumnOutput, 0)
+	} else {
+		fmt.Printf("Component not found: %s\n", name)
+	}
 }
 
 // Process is the entry point: parses flags, loads a schema, runs handlers, and returns an exit code.
