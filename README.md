@@ -1,29 +1,9 @@
-# README #
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=edgewater_fixview&metric=alert_status&token=7f58698c43ed1db7809fcdbcdfc5ae2a9c16412f)](https://sonarcloud.io/summary/new_code?id=edgewater_fixview)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=edgewater_fixview&metric=bugs&token=7f58698c43ed1db7809fcdbcdfc5ae2a9c16412f)](https://sonarcloud.io/summary/new_code?id=edgewater_fixview)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=edgewater_fixview&metric=code_smells&token=7f58698c43ed1db7809fcdbcdfc5ae2a9c16412f)](https://sonarcloud.io/summary/new_code?id=edgewater_fixview)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=edgewater_fixview&metric=coverage&token=7f58698c43ed1db7809fcdbcdfc5ae2a9c16412f)](https://sonarcloud.io/summary/new_code?id=edgewater_fixview)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=edgewater_fixview&metric=duplicated_lines_density&token=7f58698c43ed1db7809fcdbcdfc5ae2a9c16412f)](https://sonarcloud.io/summary/new_code?id=edgewater_fixview)
 
-This README would normally document whatever steps are necessary to get your application up and running.
+# Steve's FIX Decoder / log prettify utility #
 
-### What is this repository for? ###
-
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
-
-### How do I get set up? ###
-
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
-
-### Contribution guidelines ###
-
-* Writing tests
-* Code review
-* Other guidelines
-
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+![Screen Shot](docs/fixview.png)
