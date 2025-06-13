@@ -12,4 +12,4 @@
 
 # Steve's FIX Decoder / log prettify utility #
 
-![Screen Shot](docs/fixview.png)
+![Screen Shot](docs/fixdecoder.png)
