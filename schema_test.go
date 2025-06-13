@@ -2,6 +2,9 @@ package main
 
 import (
 	"encoding/xml"
+	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -137,4 +140,103 @@ func TestBuildSchemaHeaderTrailer(t *testing.T) {
 	if _, ok := s.Components["Trailer"]; !ok {
 		t.Error("Trailer component missing")
 	}
+}
+
+// TestLoadSchemaFromOpts_FileMissing exercises the final `return loadSchema(...)`
+// when the path does not exist, so we get an error.
+func TestLoadSchemaFromOptsFileMissing(t *testing.T) {
+	opts := CLIOptions{XMLPath: "does_not_exist_12345.xml"}
+	_, err := loadSchemaFromOpts(opts)
+	if err == nil {
+		t.Fatal("expected error loading nonexistent file, got nil")
+	}
+}
+
+// TestLoadSchemaFromOpts_FileValid exercises the same branch but with a real file,
+// so loadSchemaFromOpts should return successfully.
+func TestLoadSchemaFromOptsFileValid(t *testing.T) {
+	// write a minimal-but-valid FIX XML to a temp file
+	dir := t.TempDir()
+	filename := filepath.Join(dir, "minimal.xml")
+	const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<fix major="1" minor="0">
+  <fields>
+    <field name="Foo" number="100" type="STRING"/>
+  </fields>
+  <components/>
+  <messages/>
+  <header/>
+  <trailer/>
+</fix>`
+	if err := os.WriteFile(filename, []byte(xmlContent), 0o644); err != nil {
+		t.Fatalf("failed to write test XML: %v", err)
+	}
+
+	opts := CLIOptions{XMLPath: filename}
+	schema, err := loadSchemaFromOpts(opts)
+	if err != nil {
+		t.Fatalf("unexpected error loading valid file: %v", err)
+	}
+
+	// ensure the Version was read from major/minor
+	if got := schema.Version; got != "1.0" {
+		t.Errorf("schema.Version = %q; want \"1.0\"", got)
+	}
+	// ensure our named field exists
+	if f, ok := schema.Fields["Foo"]; !ok {
+		t.Fatal(`schema.Fields missing key "Foo"`)
+	} else if f.Number != 100 || f.Type != "STRING" {
+		t.Errorf("schema.Fields[\"Foo\"] = %+v; want Number=100, Type=STRING", f)
+	}
+}
+
+// TestLoadSchemaFromOpts_EmbeddedValid verifies that when XMLPath is empty,
+// we parse the embedded XML for a given FIX version.
+func TestLoadSchemaFromOptsEmbeddedValid(t *testing.T) {
+	// Use the known-good embedded FIX44 schema
+	opts := CLIOptions{
+		XMLPath:    "",
+		FixVersion: "44",
+	}
+
+	schema, err := loadSchemaFromOpts(opts)
+	if err != nil {
+		t.Fatalf("unexpected error parsing embedded FIX44 XML: %v", err)
+	}
+
+	// The FIX44 spec has major="4" minor="4" → Version "4.4"
+	if got := schema.Version; got != "4.4" {
+		t.Errorf("schema.Version = %q; want \"4.4\"", got)
+	}
+
+	// And we should have at least one field defined
+	if len(schema.Fields) == 0 {
+		t.Error("schema.Fields is empty; expected at least one field")
+	}
+}
+
+// TestLoadSchemaFromOpts_FileInvalidXML verifies that malformed XML produces an error.
+func TestLoadSchemaFromOptsFileInvalidXML(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.xml")
+	// Write malformed XML
+	if err := os.WriteFile(path, []byte("<fix><broken></fix>"), 0644); err != nil {
+		t.Fatalf("failed to write bad XML: %v", err)
+	}
+
+	opts := CLIOptions{XMLPath: path}
+	_, err := loadSchemaFromOpts(opts)
+	if err == nil {
+		t.Fatal("expected unmarshal error for invalid XML, got nil")
+	}
+	// Optionally assert that it's an XML syntax error
+	if !isXMLSyntaxError(err) {
+		t.Errorf("unexpected error type: %v", err)
+	}
+}
+
+// isXMLSyntaxError reports whether err was an XML unmarshalling error.
+func isXMLSyntaxError(err error) bool {
+	var syntaxErr *xml.SyntaxError
+	return errors.As(err, &syntaxErr)
 }
