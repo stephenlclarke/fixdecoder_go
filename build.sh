@@ -45,6 +45,6 @@ URL=$(git remote get-url origin)
 log_message "Building the application ${VERSION} (branch: ${BRANCH}, commit: ${SHORT_SHA})"
 
 # build with that version baked in
-go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.Url=${URL}" -o fixdecoder
+go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.Url=${URL}" -o ./bin/fixdecoder ./cmd/fixdecoder
 
 log_message "Build complete!"

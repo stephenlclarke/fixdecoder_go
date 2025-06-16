@@ -75,7 +75,7 @@ cat >> "$out" <<EOF
 )
 
 // chooseEmbeddedXML returns the raw XML constant for a given FIX version.
-func chooseEmbeddedXML(ver string) string {
+func ChooseEmbeddedXML(ver string) string {
     switch ver {
 EOF
 for ver in "${schemaVers[@]}"; do
@@ -91,7 +91,7 @@ cat >> "$out" <<EOF
 }
 
 // supportedFixVersions returns a comma-separated list of supported FIX versions.
-func supportedFixVersions() string {
+func SupportedFixVersions() string {
     return "${versCSV}"
 }
 EOF
