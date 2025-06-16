@@ -1,12 +1,12 @@
 // display.go
-package main
+package decoder
 
 import (
 	"fmt"
 )
 
 // displayGroup displays a GroupNode with its fields, components, and nested groups.
-func displayGroup(schema SchemaTree, g GroupNode, verbose bool, columnOutput bool, indent int) {
+func DisplayGroup(schema SchemaTree, g GroupNode, verbose bool, columnOutput bool, indent int) {
 	printIndent(indent)
 	fmt.Printf("Group: %s%s\n", g.Name, formatRequired(g.Required))
 
@@ -22,17 +22,17 @@ func displayGroup(schema SchemaTree, g GroupNode, verbose bool, columnOutput boo
 	}
 
 	for _, c := range g.Components {
-		displayComponent(schema, c, verbose, columnOutput, indent+2)
+		DisplayComponent(schema, c, verbose, columnOutput, indent+2)
 	}
 
 	for _, sg := range g.Groups {
-		displayGroup(schema, sg, verbose, columnOutput, indent+2)
+		DisplayGroup(schema, sg, verbose, columnOutput, indent+2)
 	}
 }
 
 // printGroups prints all repeating groups of the message.
 func printGroups(schema SchemaTree, msg MessageNode, verbose, column bool, indent int) {
 	for _, g := range msg.Groups {
-		displayGroup(schema, g, verbose, column, indent)
+		DisplayGroup(schema, g, verbose, column, indent)
 	}
 }

@@ -1,5 +1,5 @@
 // display.go
-package main
+package decoder
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 )
 
 // listAllTags prints every tag number, name, and type.
-func listAllTags(schema SchemaTree) {
+func ListAllTags(schema SchemaTree) {
 	fields := make([]Field, 0, len(schema.Fields))
 	for _, f := range schema.Fields {
 		fields = append(fields, f)
@@ -20,7 +20,7 @@ func listAllTags(schema SchemaTree) {
 }
 
 // printTagDetails prints a field's header and, if verbose, its enum values.
-func printTagDetails(field Field, verbose, column bool) {
+func PrintTagDetails(field Field, verbose, column bool) {
 	fmt.Printf("%d: %s (%s)\n", field.Number, field.Name, field.Type)
 	if verbose {
 		if column {
@@ -33,7 +33,7 @@ func printTagDetails(field Field, verbose, column bool) {
 	}
 }
 
-func printTagsInColumns(schema SchemaTree) {
+func PrintTagsInColumns(schema SchemaTree) {
 	fs := make([]Field, 0, len(schema.Fields))
 	for _, f := range schema.Fields {
 		fs = append(fs, f)
@@ -48,5 +48,5 @@ func printTagsInColumns(schema SchemaTree) {
 		lines[i] = fmt.Sprintf("%4d: %s (%s)", f.Number, f.Name, f.Type)
 	}
 
-	printStringColumns(lines)
+	PrintStringColumns(lines)
 }

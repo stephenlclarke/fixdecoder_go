@@ -1,5 +1,5 @@
 // display.go
-package main
+package decoder
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 )
 
 // listAllMessages prints all messages in sorted order by MsgType.
-func listAllMessages(schema SchemaTree) {
+func ListAllMessages(schema SchemaTree) {
 	var msgs []MessageNode
 	for _, m := range schema.Messages {
 		msgs = append(msgs, m)
@@ -25,7 +25,7 @@ func printMessageStart(msg MessageNode) {
 }
 
 // displayMessageStructureWithOptions orchestrates the above helpers.
-func displayMessageStructureWithOptions(
+func DisplayMessageStructureWithOptions(
 	schema SchemaTree,
 	msg MessageNode,
 	verbose, includeHeader, includeTrailer, column bool,

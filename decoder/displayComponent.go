@@ -1,5 +1,5 @@
 // display.go
-package main
+package decoder
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 )
 
 // listAllComponents prints all component names in sorted order.
-func listAllComponents(schema SchemaTree) {
+func ListAllComponents(schema SchemaTree) {
 	names := make([]string, 0, len(schema.Components))
 	for name := range schema.Components {
 		names = append(names, name)
@@ -18,7 +18,7 @@ func listAllComponents(schema SchemaTree) {
 	}
 }
 
-func displayComponent(schema SchemaTree, comp ComponentNode, verbose bool, columnOutput bool, indent int) {
+func DisplayComponent(schema SchemaTree, comp ComponentNode, verbose bool, columnOutput bool, indent int) {
 	printIndent(indent)
 	fmt.Printf("Component: %s\n", comp.Name)
 
@@ -34,18 +34,18 @@ func displayComponent(schema SchemaTree, comp ComponentNode, verbose bool, colum
 	}
 
 	for _, c := range comp.Components {
-		displayComponent(schema, c, verbose, columnOutput, indent+2)
+		DisplayComponent(schema, c, verbose, columnOutput, indent+2)
 	}
 
 	for _, g := range comp.Groups {
-		displayGroup(schema, g, verbose, columnOutput, indent+2)
+		DisplayGroup(schema, g, verbose, columnOutput, indent+2)
 	}
 }
 
 // printComponents prints all nested components of the message.
 func printComponents(schema SchemaTree, msg MessageNode, verbose, column bool, indent int) {
 	for _, c := range msg.Components {
-		displayComponent(schema, c, verbose, column, indent)
+		DisplayComponent(schema, c, verbose, column, indent)
 	}
 }
 
@@ -56,7 +56,7 @@ func printHeader(schema SchemaTree, includeHeader, verbose, column bool, indent 
 	}
 
 	if headerComp, ok := schema.Components["Header"]; ok {
-		displayComponent(schema, headerComp, verbose, column, indent)
+		DisplayComponent(schema, headerComp, verbose, column, indent)
 	}
 }
 
@@ -67,6 +67,6 @@ func printTrailer(schema SchemaTree, includeTrailer, verbose, column bool, inden
 	}
 
 	if trailerComp, ok := schema.Components["Trailer"]; ok {
-		displayComponent(schema, trailerComp, verbose, column, indent)
+		DisplayComponent(schema, trailerComp, verbose, column, indent)
 	}
 }

@@ -1,5 +1,5 @@
 // display.go
-package main
+package decoder
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 )
 
 // findField returns the Field with the given number, or false if not found.
-func findField(schema SchemaTree, tagID int) (Field, bool) {
+func FindField(schema SchemaTree, tagID int) (Field, bool) {
 	for _, f := range schema.Fields {
 		if f.Number == tagID {
 			return f, true
@@ -29,7 +29,7 @@ func printField(field FieldNode, indent int) {
 }
 
 // printStringColumns prints a slice of strings in columns based on terminal width.
-func printStringColumns(items []string) {
+func PrintStringColumns(items []string) {
 	width, _, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
 		width = 80

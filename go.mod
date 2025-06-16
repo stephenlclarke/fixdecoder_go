@@ -2,7 +2,7 @@ module bitbucket.org/edgewater/fixdecoder
 
 go 1.23.0
 
-toolchain go1.23.10
+toolchain go1.24.3
 
 require golang.org/x/term v0.32.0
 

@@ -1,5 +1,5 @@
 // schema.go
-package main
+package decoder
 
 import (
 	"encoding/xml"
@@ -100,7 +100,7 @@ type SchemaTree struct {
 	ServicePack string
 }
 
-func buildSchema(dict FixDictionary) SchemaTree {
+func BuildSchema(dict FixDictionary) SchemaTree {
 	fieldMap := make(map[string]Field, len(dict.Fields))
 	for _, f := range dict.Fields {
 		fieldMap[f.Name] = f
