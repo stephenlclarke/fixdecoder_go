@@ -17,24 +17,39 @@ definitions:
               GITLEAKS_EXTRA_ARGS:
                 - "-v"
                 - "--config=gitleaks-config.toml"
-
-    - step: &build_test
-        name: Build, Test & Coverage
+                
+    - step: &build
+        name: Build
         caches:
           - go
         script:
-          - ./build.sh
+          - make build
         artifacts:
-          - coverage.out
-          - coverage.integration.out
-          - test_report.xml
+          - bin/**
+
+    - step: &unit-tests
+        name: Unit Tests
+        caches:
+          - go
+        script:
+          - make unit-test
+        artifacts:
+          - reports/*.out
+          - reports/*.xml
+
+    - step: &integration-tests
+        name: Integration Tests
+        caches:
+          - go
+        script:
+          - make integration-test
+        artifacts:
+          - reports/*.out
 
     - step: &sonar_analysis
         name: SonarCloud Analysis
         artifacts:
-          - coverage.out
-          - coverage.integration.out
-          - test_report.xml
+          - reports/**
         caches:
           - go
         script:
@@ -47,11 +62,18 @@ definitions:
 
 pipelines:
   default:
-    - step: *security_scan
-    - step: *build_test
+    - parallel:
+        - step: *security_scan
+        - step: *build
+        - step: *unit-tests
+        - step: *integration-tests
+    - step: *sonar_analysis
 
   branches:
-    '{main,master,develop}':
-      - step: *security_scan
-      - step: *build_test
+    "{main,master,develop}":
+      - parallel:
+          - step: *security_scan
+          - step: *build
+          - step: *unit-tests
+          - step: *integration-tests
       - step: *sonar_analysis
