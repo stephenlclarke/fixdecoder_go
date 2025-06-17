@@ -8,7 +8,7 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 go env -w GOPRIVATE=bitbucket.org/edgewater/fixdecoder
 
 go mod tidy
-go mod download
+#go mod download
 go install github.com/jstemmer/go-junit-report/v2@latest
 
 log_message "Generating FIX44 dictionary"
