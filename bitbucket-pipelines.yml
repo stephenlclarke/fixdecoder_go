@@ -24,6 +24,8 @@ definitions:
           - go
         script:
           - make build
+        after-script:
+          - ls -lart bin/
         artifacts:
           - bin/**
 
@@ -33,6 +35,8 @@ definitions:
           - go
         script:
           - make unit-test
+        after-script:
+          - ls -lart reports
         artifacts:
           - reports/*.out
           - reports/*.xml
@@ -43,6 +47,8 @@ definitions:
           - go
         script:
           - make integration-test
+        after-script:
+          - ls -lart reports
         artifacts:
           - reports/*.out
 
@@ -52,6 +58,8 @@ definitions:
           - reports/**
         caches:
           - go
+        before-script:
+          - ls -lart reports
         script:
           - pipe: sonarsource/sonarcloud-scan:3.1.0
             variables:
@@ -62,18 +70,16 @@ definitions:
 
 pipelines:
   default:
-    - parallel:
-        - step: *security_scan
-        - step: *build
-        - step: *unit-tests
-        - step: *integration-tests
+    - step: *security_scan
+    - step: *build
+    - step: *unit-tests
+    - step: *integration-tests
     - step: *sonar_analysis
 
   branches:
     "{main,master,develop}":
-      - parallel:
-          - step: *security_scan
-          - step: *build
-          - step: *unit-tests
-          - step: *integration-tests
+      - step: *security_scan
+      - step: *build
+      - step: *unit-tests
+      - step: *integration-tests
       - step: *sonar_analysis
