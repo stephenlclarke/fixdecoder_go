@@ -15,19 +15,19 @@ func ListAllTags(schema SchemaTree) {
 
 	sort.Slice(fields, func(i, j int) bool { return fields[i].Number < fields[j].Number })
 	for _, field := range fields {
-		fmt.Printf("%4d: %s (%s)\n", field.Number, field.Name, field.Type)
+		fmt.Printf("%-4d: %s (%s)\n", field.Number, field.Name, field.Type)
 	}
 }
 
 // printTagDetails prints a field's header and, if verbose, its enum values.
 func PrintTagDetails(field Field, verbose, column bool) {
-	fmt.Printf("%d: %s (%s)\n", field.Number, field.Name, field.Type)
+	fmt.Printf("%-4d: %s (%s)\n", field.Number, field.Name, field.Type)
 	if verbose {
 		if column {
-			printEnumColumns(field.Values, 2)
+			printEnumColumns(field.Values, 4)
 		} else {
 			for _, v := range field.Values {
-				printEnum(v.Enum, v.Description, 2)
+				printEnum(v.Enum, v.Description, 4)
 			}
 		}
 	}
@@ -45,7 +45,7 @@ func PrintTagsInColumns(schema SchemaTree) {
 
 	lines := make([]string, len(fs))
 	for i, f := range fs {
-		lines[i] = fmt.Sprintf("%4d: %s (%s)", f.Number, f.Name, f.Type)
+		lines[i] = fmt.Sprintf("%-4d: %s (%s)", f.Number, f.Name, f.Type)
 	}
 
 	PrintStringColumns(lines)

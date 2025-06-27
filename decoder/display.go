@@ -23,7 +23,7 @@ func FindField(schema SchemaTree, tagID int) (Field, bool) {
 
 func printField(field FieldNode, indent int) {
 	printIndent(indent)
-	fmt.Printf("%4d: %s (%s)%s\n",
+	fmt.Printf("%-4d: %s (%s)%s\n",
 		field.Field.Number, field.Field.Name, field.Field.Type, formatRequired(field.Ref.Required),
 	)
 }
@@ -62,10 +62,10 @@ func printFields(msg MessageNode, verbose, column bool, indent int) {
 		printField(f, indent)
 
 		if verbose && column {
-			printEnumColumns(f.Field.Values, indent+4)
+			printEnumColumns(f.Field.Values, indent)
 		} else if verbose {
 			for _, val := range f.Field.Values {
-				printEnum(val.Enum, val.Description, indent+4)
+				printEnum(val.Enum, val.Description, indent+2)
 			}
 		}
 	}
@@ -76,8 +76,8 @@ func printIndent(level int) {
 }
 
 func printEnum(enum string, description string, indent int) {
-	printIndent(indent)
-	fmt.Printf("%s: %s\n", enum, description)
+	printIndent(indent + 4)
+	fmt.Printf("%s : %s\n", enum, description)
 }
 
 func formatRequired(req string) string {

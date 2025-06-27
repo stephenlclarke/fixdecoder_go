@@ -15,10 +15,10 @@ func TestDisplayComponentBasic(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		DisplayComponent(schema, comp, false, false, 0)
+		DisplayComponent(schema, MessageNode{}, comp, false, false, 0)
 	})
 
-	if want := "Component: Comp1\n     1: F1 (STRING)\n"; out != want {
+	if want := "Component: Comp1\n    1   : F1 (STRING)\n"; out != want {
 		t.Errorf("output = %q; want %q", out, want)
 	}
 }
@@ -36,7 +36,7 @@ func TestDisplayComponentVerboseColumn(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		DisplayComponent(schema, comp, true, true, 0)
+		DisplayComponent(schema, MessageNode{}, comp, true, true, 0)
 	})
 
 	// Look for column output
@@ -58,11 +58,11 @@ func TestDisplayComponentVerboseNoColumn(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		DisplayComponent(schema, comp, true, false, 0)
+		DisplayComponent(schema, MessageNode{}, comp, true, false, 0)
 	})
 
 	// Should contain indented enums
-	if !bytes.Contains([]byte(out), []byte("A: Alpha")) || !bytes.Contains([]byte(out), []byte("B: Beta")) {
+	if !bytes.Contains([]byte(out), []byte("A : Alpha")) || !bytes.Contains([]byte(out), []byte("B : Beta")) {
 		t.Errorf("Missing enums in output: %q", out)
 	}
 }
@@ -89,7 +89,7 @@ func TestDisplayComponentNestedComponentsAndGroups(t *testing.T) {
 	}
 
 	out := captureStdout(func() {
-		DisplayComponent(SchemaTree{}, comp, false, false, 0)
+		DisplayComponent(SchemaTree{}, MessageNode{}, comp, false, false, 0)
 	})
 
 	// Check nested component/group presence
@@ -109,7 +109,7 @@ func TestPrintHeaderIncludeFalse(t *testing.T) {
 	}
 	// Should print nothing
 	out := captureStdout(func() {
-		printHeader(schema, false, true, false, 0)
+		printHeader(schema, MessageNode{}, false, true, false, 0)
 	})
 	if out != "" {
 		t.Errorf("printHeader(includeHeader=false) output = %q; want empty", out)
@@ -124,7 +124,7 @@ func TestPrintHeaderIncludeTrueHeaderExists(t *testing.T) {
 	}
 	// Should print header component
 	out := captureStdout(func() {
-		printHeader(schema, true, false, false, 1)
+		printHeader(schema, MessageNode{}, true, false, false, 1)
 	})
 	if want := " Component: Header\n"; out != want {
 		t.Errorf("printHeader(includeHeader=true) = %q; want %q", out, want)
@@ -136,7 +136,7 @@ func TestPrintHeaderIncludeTrueHeaderMissing(t *testing.T) {
 		Components: map[string]ComponentNode{},
 	}
 	out := captureStdout(func() {
-		printHeader(schema, true, false, false, 0)
+		printHeader(schema, MessageNode{}, true, false, false, 0)
 	})
 	// Should print nothing, as no Header exists
 	if out != "" {

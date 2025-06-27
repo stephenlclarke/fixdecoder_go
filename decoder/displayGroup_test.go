@@ -19,7 +19,7 @@ func TestDisplayGroupBasic(t *testing.T) {
 	got := captureStdout(func() {
 		DisplayGroup(SchemaTree{}, group, false, false, 0)
 	})
-	if want := "Group: Group1 - (Y)\n    10: F1 (INT) - (Y)\n"; got[:len(want)] != want {
+	if want := "Group: Group1 - (Y)\n    10  : F1 (INT) - (Y)\n"; got[:len(want)] != want {
 		t.Errorf("unexpected output: got %q, want %q", got, want)
 	}
 }
@@ -37,7 +37,7 @@ func TestDisplayGroupVerbose(t *testing.T) {
 	got := captureStdout(func() {
 		DisplayGroup(SchemaTree{}, group, true, false, 2)
 	})
-	if !bytes.Contains([]byte(got), []byte("B: Beta")) {
+	if !bytes.Contains([]byte(got), []byte("B : Beta")) {
 		t.Errorf("expected verbose enum in output, got: %q", got)
 	}
 }

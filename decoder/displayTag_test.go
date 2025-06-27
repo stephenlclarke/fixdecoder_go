@@ -15,11 +15,13 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 			{Enum: "B", Description: "Banana"},
 		},
 	}
+
 	// 1. Not verbose: only header printed
 	out := captureStdout(func() {
 		PrintTagDetails(field, false, false)
 	})
-	want := "42: TestTag (STRING)\n"
+
+	want := "42  : TestTag (STRING)\n"
 	if out != want {
 		t.Errorf("not verbose: got %q, want %q", out, want)
 	}
@@ -28,10 +30,12 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 	out = captureStdout(func() {
 		PrintTagDetails(field, true, false)
 	})
-	if !strings.Contains(out, "  A: Apple") || !strings.Contains(out, "  B: Banana") {
+
+	if !strings.Contains(out, "  A : Apple") || !strings.Contains(out, "  B : Banana") {
 		t.Errorf("verbose no-column: missing values, got %q", out)
 	}
-	if !strings.Contains(out, "42: TestTag (STRING)\n") {
+
+	if !strings.Contains(out, "42  : TestTag (STRING)\n") {
 		t.Errorf("verbose no-column: missing header, got %q", out)
 	}
 
@@ -40,11 +44,13 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 	out = captureStdout(func() {
 		PrintTagDetails(field, true, true)
 	})
+
 	// The output will include both values, and the header.
-	if !strings.Contains(out, "42: TestTag (STRING)\n") {
+	if !strings.Contains(out, "42  : TestTag (STRING)\n") {
 		t.Errorf("verbose column: missing header, got %q", out)
 	}
-	if !strings.Contains(out, "A: Apple") || !strings.Contains(out, "B: Banana") {
+
+	if !strings.Contains(out, "    A: Apple   B: Banana  \n") {
 		t.Errorf("verbose column: missing value strings, got %q", out)
 	}
 
@@ -53,7 +59,8 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 	out = captureStdout(func() {
 		PrintTagDetails(emptyField, true, false)
 	})
-	if out != "7: NoEnums (INT)\n" {
+
+	if out != "7   : NoEnums (INT)\n" {
 		t.Errorf("empty values: got %q, want header only", out)
 	}
 }

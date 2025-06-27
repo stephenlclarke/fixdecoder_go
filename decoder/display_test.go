@@ -119,7 +119,7 @@ func TestPrintFieldsVerboseNoColumn(t *testing.T) {
 	})
 
 	// Should list each enum on its own line
-	expects := []string{"    EV1: Desc1", "    EV2: Desc2", "    EVA: DescA", "    EVB: DescB"}
+	expects := []string{"    EV1 : Desc1", "    EV2 : Desc2", "    EVA : DescA", "    EVB : DescB"}
 	for _, exp := range expects {
 		if !strings.Contains(output, exp) {
 			t.Errorf("expected %q in output; got %q", exp, output)

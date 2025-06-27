@@ -105,29 +105,41 @@ func BuildSchema(dict FixDictionary) SchemaTree {
 	for _, f := range dict.Fields {
 		fieldMap[f.Name] = f
 	}
+
 	compMap := make(map[string]Component, len(dict.Components))
 	for _, c := range dict.Components {
 		compMap[c.Name] = c
 	}
+
 	schema := SchemaTree{
-		Fields:     fieldMap,
-		Components: make(map[string]ComponentNode),
-		Messages:   make(map[string]MessageNode),
-		Version:    dict.Major + "." + dict.Minor,
+		Fields:      fieldMap,
+		Components:  make(map[string]ComponentNode),
+		Messages:    make(map[string]MessageNode),
+		Version:     dict.Major + "." + dict.Minor,
+		ServicePack: dict.ServicePack,
 	}
+
+	if dict.ServicePack == "" {
+		schema.ServicePack = "n/a"
+	}
+
 	for _, c := range dict.Components {
 		schema.Components[c.Name] = buildComponentNode(c, fieldMap, compMap)
 	}
+
 	for _, m := range dict.Messages {
 		schema.Messages[m.Name] = buildMessageNode(m, fieldMap, compMap)
 	}
+
 	// Include Header and Trailer as components
 	header := dict.Header
 	header.Name = "Header"
 	schema.Components["Header"] = buildComponentNode(header, fieldMap, compMap)
+
 	trailer := dict.Trailer
 	trailer.Name = "Trailer"
 	schema.Components["Trailer"] = buildComponentNode(trailer, fieldMap, compMap)
+
 	return schema
 }
 

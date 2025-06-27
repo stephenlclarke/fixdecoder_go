@@ -15,7 +15,7 @@ func ListAllMessages(schema SchemaTree) {
 
 	sort.Slice(msgs, func(i, j int) bool { return msgs[i].MsgType < msgs[j].MsgType })
 	for _, m := range msgs {
-		fmt.Printf("%2s: %s (%s)\n", m.MsgType, m.Name, m.MsgCat)
+		fmt.Printf("%-4s: %s (%s)\n", m.MsgType, m.Name, m.MsgCat)
 	}
 }
 
@@ -32,9 +32,9 @@ func DisplayMessageStructureWithOptions(
 	indent int,
 ) {
 	printMessageStart(msg)
-	printHeader(schema, includeHeader, verbose, column, indent)
+	printHeader(schema, msg, includeHeader, verbose, column, indent)
 	printFields(msg, verbose, column, indent)
 	printComponents(schema, msg, verbose, column, indent)
 	printGroups(schema, msg, verbose, column, indent)
-	printTrailer(schema, includeTrailer, verbose, column, indent)
+	printTrailer(schema, msg, includeTrailer, verbose, column, indent)
 }
