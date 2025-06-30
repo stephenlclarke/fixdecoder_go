@@ -2,6 +2,9 @@ package decoder
 
 import (
 	"bytes"
+	"io"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -141,5 +144,134 @@ func TestPrintHeaderIncludeTrueHeaderMissing(t *testing.T) {
 	// Should print nothing, as no Header exists
 	if out != "" {
 		t.Errorf("printHeader(header missing) output = %q; want empty", out)
+	}
+}
+
+func TestListAllComponents(t *testing.T) {
+	schema := SchemaTree{
+		Components: map[string]ComponentNode{
+			"Instrument":    {},
+			"Parties":       {},
+			"OrderQtyData":  {},
+			"NestedParties": {},
+		},
+	}
+
+	// Capture stdout
+	var buf bytes.Buffer
+	stdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	ListAllComponents(schema)
+
+	// Restore stdout
+	w.Close()
+	os.Stdout = stdout
+	io.Copy(&buf, r)
+
+	output := buf.String()
+	expected := strings.Join([]string{
+		"Instrument",
+		"NestedParties",
+		"OrderQtyData",
+		"Parties",
+		"",
+	}, "\n")
+
+	if output != expected {
+		t.Errorf("Expected sorted component list:\nGot:\n%s\nWant:\n%s", output, expected)
+	}
+}
+
+func TestPrintMatchingEnumMatch(t *testing.T) {
+	called := false
+	var gotEnum, gotDesc string
+	var gotIndent int
+
+	original := printEnumFunc
+	printEnumFunc = func(enum, desc string, indent int) {
+		called = true
+		gotEnum = enum
+		gotDesc = desc
+		gotIndent = indent
+	}
+	defer func() { printEnumFunc = original }()
+
+	values := []Value{
+		{Enum: "0", Description: "New"},
+		{Enum: "1", Description: "Replace"},
+		{Enum: "2", Description: "Cancel"},
+	}
+
+	printMatchingEnum(values, "1", 2)
+
+	if !called {
+		t.Fatal("Expected printEnumFunc to be called")
+	}
+	if gotEnum != "1" || gotDesc != "Replace" || gotIndent != 2 {
+		t.Errorf("Unexpected values: got (%s, %s, %d)", gotEnum, gotDesc, gotIndent)
+	}
+}
+
+func TestPrintMatchingEnumNoMatch(t *testing.T) {
+	called := false
+
+	original := printEnumFunc
+	printEnumFunc = func(enum, desc string, indent int) {
+		called = true
+	}
+	defer func() { printEnumFunc = original }()
+
+	values := []Value{
+		{Enum: "0", Description: "New"},
+		{Enum: "1", Description: "Replace"},
+	}
+
+	printMatchingEnum(values, "X", 0)
+
+	if called {
+		t.Error("Expected printEnumFunc NOT to be called")
+	}
+}
+
+func TestDisplayComponentMsgTypeEnumOnly(t *testing.T) {
+	field := Field{
+		Name:   "MsgType",
+		Number: 35,
+		Type:   "STRING",
+		Values: []Value{
+			{Enum: "D", Description: "NewOrderSingle"},
+			{Enum: "F", Description: "OrderCancelRequest"},
+		},
+	}
+
+	fieldNode := FieldNode{Field: field}
+
+	component := ComponentNode{
+		Fields: []FieldNode{fieldNode},
+	}
+
+	msg := MessageNode{
+		MsgType: "F",
+		Name:    "OrderCancelRequest",
+		MsgCat:  "app",
+	}
+
+	var output bytes.Buffer
+	stdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Call with verbose=true, columnOutput=false, indent=0
+	DisplayComponent(SchemaTree{}, msg, component, true, false, 0)
+
+	w.Close()
+	os.Stdout = stdout
+	io.Copy(&output, r)
+
+	got := output.String()
+	if !strings.Contains(got, "F") || !strings.Contains(got, "OrderCancelRequest") {
+		t.Errorf("Expected to print only matching MsgType enum, got:\n%s", got)
 	}
 }

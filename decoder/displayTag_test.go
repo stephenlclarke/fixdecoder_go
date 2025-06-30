@@ -1,6 +1,10 @@
 package decoder
 
 import (
+	"bytes"
+	"io"
+	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -62,5 +66,66 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 
 	if out != "7   : NoEnums (INT)\n" {
 		t.Errorf("empty values: got %q, want header only", out)
+	}
+}
+
+func TestListAllTags(t *testing.T) {
+	schema := SchemaTree{
+		Fields: map[string]Field{
+			"Account": {Name: "Account", Number: 1, Type: "STRING"},
+			"ClOrdID": {Name: "ClOrdID", Number: 11, Type: "STRING"},
+			"OrderID": {Name: "OrderID", Number: 37, Type: "STRING"},
+		},
+	}
+
+	// Capture stdout
+	var buf bytes.Buffer
+	orig := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	ListAllTags(schema)
+
+	// Restore stdout
+	w.Close()
+	os.Stdout = orig
+	io.Copy(&buf, r)
+
+	output := buf.String()
+
+	expected := "1   : Account (STRING)\n" +
+		"11  : ClOrdID (STRING)\n" +
+		"37  : OrderID (STRING)\n"
+
+	if output != expected {
+		t.Errorf("Unexpected output:\nGot:\n%s\nWant:\n%s", output, expected)
+	}
+}
+
+func TestPrintTagsInColumns(t *testing.T) {
+	schema := SchemaTree{
+		Fields: map[string]Field{
+			"ClOrdID": {Name: "ClOrdID", Number: 11, Type: "STRING"},
+			"Account": {Name: "Account", Number: 1, Type: "STRING"},
+			"OrderID": {Name: "OrderID", Number: 37, Type: "STRING"},
+		},
+	}
+
+	var got []string
+	original := printStringColumns
+	printStringColumns = func(lines []string) {
+		got = lines
+	}
+	defer func() { printStringColumns = original }()
+
+	PrintTagsInColumns(schema)
+
+	want := []string{
+		"1   : Account (STRING)",
+		"11  : ClOrdID (STRING)",
+		"37  : OrderID (STRING)",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Unexpected column output.\nGot:  %#v\nWant: %#v", got, want)
 	}
 }

@@ -11,6 +11,8 @@ import (
 	"golang.org/x/term"
 )
 
+var getTerminalSize = term.GetSize
+
 // findField returns the Field with the given number, or false if not found.
 func FindField(schema SchemaTree, tagID int) (Field, bool) {
 	for _, f := range schema.Fields {
@@ -30,7 +32,7 @@ func printField(field FieldNode, indent int) {
 
 // printStringColumns prints a slice of strings in columns based on terminal width.
 func PrintStringColumns(items []string) {
-	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	width, _, err := getTerminalSize(int(os.Stdout.Fd()))
 	if err != nil {
 		width = 80
 	}

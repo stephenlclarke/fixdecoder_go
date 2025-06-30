@@ -6,6 +6,8 @@ import (
 	"sort"
 )
 
+var printEnumFunc = printEnum
+
 // listAllComponents prints all component names in sorted order.
 func ListAllComponents(schema SchemaTree) {
 	names := make([]string, 0, len(schema.Components))
@@ -23,7 +25,7 @@ func ListAllComponents(schema SchemaTree) {
 func printMatchingEnum(values []Value, want string, indent int) {
 	for _, v := range values {
 		if v.Enum == want {
-			printEnum(v.Enum, v.Description, indent)
+			printEnumFunc(v.Enum, v.Description, indent)
 			break
 		}
 	}
@@ -46,7 +48,7 @@ func DisplayComponent(schema SchemaTree, msg MessageNode, comp ComponentNode, ve
 					printEnumColumns(f.Field.Values, indent+6)
 				} else {
 					for _, v := range f.Field.Values {
-						printEnum(v.Enum, v.Description, indent+6)
+						printEnumFunc(v.Enum, v.Description, indent+6)
 					}
 				}
 			}

@@ -6,6 +6,8 @@ import (
 	"sort"
 )
 
+var printStringColumns = PrintStringColumns
+
 // listAllTags prints every tag number, name, and type.
 func ListAllTags(schema SchemaTree) {
 	fields := make([]Field, 0, len(schema.Fields))
@@ -48,5 +50,5 @@ func PrintTagsInColumns(schema SchemaTree) {
 		lines[i] = fmt.Sprintf("%-4d: %s (%s)", f.Number, f.Name, f.Type)
 	}
 
-	PrintStringColumns(lines)
+	printStringColumns(lines)
 }

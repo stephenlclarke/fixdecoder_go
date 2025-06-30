@@ -3,6 +3,8 @@ package decoder
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -140,5 +142,150 @@ func TestPrintFieldsVerboseColumn(t *testing.T) {
 		if !strings.Contains(output, exp) {
 			t.Errorf("expected column output %q; got %q", exp, output)
 		}
+	}
+}
+
+func TestListAllMessages(t *testing.T) {
+	schema := SchemaTree{
+		Messages: map[string]MessageNode{
+			"NewOrderSingle": {
+				Name:    "NewOrderSingle",
+				MsgType: "D",
+				MsgCat:  "app",
+			},
+			"ExecutionReport": {
+				Name:    "ExecutionReport",
+				MsgType: "8",
+				MsgCat:  "app",
+			},
+			"OrderCancelRequest": {
+				Name:    "OrderCancelRequest",
+				MsgType: "F",
+				MsgCat:  "app",
+			},
+		},
+	}
+
+	// Capture stdout
+	var buf bytes.Buffer
+	stdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	ListAllMessages(schema)
+
+	// Restore stdout
+	w.Close()
+	os.Stdout = stdout
+	io.Copy(&buf, r)
+
+	output := buf.String()
+
+	// Assert order: 8 < D < F
+	expected := "8   : ExecutionReport (app)\n" +
+		"D   : NewOrderSingle (app)\n" +
+		"F   : OrderCancelRequest (app)\n"
+
+	if output != expected {
+		t.Errorf("Unexpected output:\nGot:\n%s\nWant:\n%s", output, expected)
+	}
+}
+
+func TestFindField(t *testing.T) {
+	schema := SchemaTree{
+		Fields: map[string]Field{
+			"Account": {Name: "Account", Number: 1, Type: "STRING"},
+			"ClOrdID": {Name: "ClOrdID", Number: 11, Type: "STRING"},
+		},
+	}
+
+	// Case: tag exists
+	field, ok := FindField(schema, 11)
+	if !ok || field.Name != "ClOrdID" {
+		t.Errorf("Expected to find ClOrdID, got: %v, found: %v", field.Name, ok)
+	}
+
+	// Case: tag does not exist
+	field, ok = FindField(schema, 999)
+	if ok {
+		t.Errorf("Expected not to find tag 999, but got: %v", field)
+	}
+}
+
+func TestPrintStringColumnsTerminalSuccess(t *testing.T) {
+	// Redirect stdout
+	var buf bytes.Buffer
+	stdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Mock terminal size
+	original := getTerminalSize
+	getTerminalSize = func(fd int) (int, int, error) {
+		return 40, 0, nil
+	}
+	defer func() { getTerminalSize = original }()
+
+	PrintStringColumns([]string{"One", "Two", "Three", "Four"})
+
+	// Restore and capture output
+	w.Close()
+	os.Stdout = stdout
+	io.Copy(&buf, r)
+
+	got := buf.String()
+	if !strings.Contains(got, "One") || !strings.Contains(got, "Four") {
+		t.Errorf("Expected output to include input items, got:\n%s", got)
+	}
+}
+
+func TestPrintStringColumnsTerminalError(t *testing.T) {
+	var buf bytes.Buffer
+	stdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	original := getTerminalSize
+	getTerminalSize = func(fd int) (int, int, error) {
+		return 0, 0, errors.New("mock failure")
+	}
+	defer func() { getTerminalSize = original }()
+
+	PrintStringColumns([]string{"Alpha", "Beta", "Gamma"})
+
+	w.Close()
+	os.Stdout = stdout
+	io.Copy(&buf, r)
+
+	got := buf.String()
+	if !strings.Contains(got, "Alpha") {
+		t.Errorf("Expected fallback output, got:\n%s", got)
+	}
+}
+
+func TestPrintStringColumnsColsFallback(t *testing.T) {
+	// Redirect stdout to capture output
+	var buf bytes.Buffer
+	stdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Mock terminal width to force cols == 0
+	original := getTerminalSize
+	getTerminalSize = func(fd int) (int, int, error) {
+		return 1, 0, nil // Very small width
+	}
+	defer func() { getTerminalSize = original }()
+
+	PrintStringColumns([]string{"LongStringThatWillNotFit"})
+
+	// Restore and capture output
+	w.Close()
+	os.Stdout = stdout
+	io.Copy(&buf, r)
+
+	got := buf.String()
+	if !strings.Contains(got, "LongStringThatWillNotFit") {
+		t.Errorf("Expected output to include fallback rendering:\n%s", got)
 	}
 }
