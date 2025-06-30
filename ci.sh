@@ -31,6 +31,12 @@ MODULES=(
 	"fix/fixT11"
 )
 
+declare common_preparation=false
+declare compile_binary=false
+declare unit_tests=false
+declare integration_tests=false
+declare code_scan=false
+
 function log_message {
   echo -e "\n\033[1;32m$1\033[0m"
 }
@@ -54,17 +60,21 @@ function tidy() {
 }
 
 function generate_fix() {
-  echo ">> Auto-Generating FIX dictionary"
+  log_message ">> Auto-Generating FIX dictionary"
   chmod +x ./resources/generate_fix_go.sh
   ./resources/generate_fix_go.sh
 }
 
 function unit_tests() {
-  log_message ">>Running unit tests"
+  if [[ $unit_tests == true ]]; then
+    return
+  fi
+
+  log_message ">> Running unit tests"
   mkdir -p reports
   rm -f coverage.out
   for module in ${MODULES[@]}; do
-      echo " - Testing $module"
+      log_message " - Testing $module"
       abs_report_path=$(cd reports && pwd)/coverage-`basename $module`.out
       cd $module
       go test -v -covermode=atomic -coverprofile=$abs_report_path .
@@ -93,83 +103,111 @@ function unit_tests() {
   log_message ">> Generating HTML coverage report"
   go tool cover -html=reports/coverage.out -o reports/coverage.html
   log_message "HTML report available at reports/coverage.html"
+
+  unit_tests=true
 }
 
 function compile_binary() {
-    # ensure the bin directory exists
-    mkdir -p ./bin
+  if [[ $compile_binary == true ]]; then
+    return
+  fi
 
-    # ensure your tags are fetched
-    git fetch --tags
+  # ensure the bin directory exists
+  mkdir -p ./bin
 
-    # grab the latest tag and construct a version string (e.g. "v1.2.3")
-    TAG=$(git describe --tags --abbrev=0 2>/dev/null)
-    VERSION=${TAG:="v0.0.0"}
-    git status --porcelain >/dev/null 2>&1 && VERSION="${VERSION}-dirty"
+  # ensure your tags are fetched
+  git fetch --tags
 
-    BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    SHORT_SHA=$(git rev-parse --short HEAD)
+  # grab the latest tag and construct a version string (e.g. "v1.2.3")
+  TAG=$(git describe --tags --abbrev=0 2>/dev/null)
+  VERSION=${TAG:="v0.0.0"}
+  git status --porcelain >/dev/null 2>&1 && VERSION="${VERSION}-dirty"
 
-    URL=$(git remote get-url origin)
+  BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  SHORT_SHA=$(git rev-parse --short HEAD)
 
-    log_message ">> Building the application ${VERSION} (branch: ${BRANCH}, commit: ${SHORT_SHA})"
+  URL=$(git remote get-url origin)
 
-    # build with that version baked in
-    go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.Url=${URL}" -o ./bin/fixdecoder ./cmd/fixdecoder
+  log_message ">> Building the application ${VERSION} (branch: ${BRANCH}, commit: ${SHORT_SHA})"
+
+  # build with that version baked in
+  go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.Url=${URL}" -o ./bin/fixdecoder ./cmd/fixdecoder
+
+  compile_binary=true
 }
 
 function integration_tests() {
+  if [[ $integration_tests == true ]]; then
+    return
+  fi
+
   log_message ">> Running integration tests"
   # integration tests
   go test -v -tags=integration -covermode=atomic -coverpkg=./... -coverprofile=reports/coverage.integration.out ./...
   go test -tags=integration -timeout=10m -run '^TestMain' ./...
+
+  integration_tests=true
 }
 
 function code_scan() {
-  echo ">> SonarQube Scan"
+  if [[ $code_scan == true ]]; then
+    return
+  fi
+
+  log_message ">> SonarQube Scan"
   docker run --rm -e SONAR_TOKEN="${SONAR_TOKEN}" -v "$(pwd):/usr/src" sonarsource/sonar-scanner-cli
+
+  code_scan=true
 }
 
 # Helper that runs the common pre-build steps in order
 function common_preparation() {
+  if [[ $common_preparation == true ]]; then
+    return
+  fi
+
   setup_environment
   install_dependencies
   tidy
   generate_fix
+
+  common_preparation=true
 }
 
-# Target dispatcher
-target=${1:-""}
-case "$target" in
-  all)
-    common_preparation
-    compile_binary
-    unit_tests
-    integration_tests
-    code_scan
-    ;;
+# Argument dispatcher
+if [[ $# -eq 0 ]]; then
+  log_message "usage: $0 {all|build|unit-test|integration-test|scan} [...]"
+  exit 1
+fi
 
-  build)
-    common_preparation
-    compile_binary
-    ;;
-
-  unit-test)
-    common_preparation
-    unit_tests
-    ;;
-
-  integration-test)
-    common_preparation
-    integration_tests
-    ;;
-
-  scan)
-    code_scan
-    ;;
-
-  *)
-    echo "usage: $0 {all|build|unit-test|integration-test|scan}"
-    exit 1
-    ;;
-esac
+for target in "$@"; do
+  case "$target" in
+    all)
+      common_preparation
+      compile_binary
+      unit_tests
+      integration_tests
+      code_scan
+      ;;
+    build)
+      common_preparation
+      compile_binary
+      ;;
+    unit-test)
+      common_preparation
+      unit_tests
+      ;;
+    integration-test)
+      common_preparation
+      integration_tests
+      ;;
+    scan)
+      code_scan
+      ;;
+    *)
+      log_message "Unknown target: $target"
+      log_message "usage: $0 {all|build|unit-test|integration-test|scan} [...]"
+      exit 1
+      ;;
+  esac
+done
