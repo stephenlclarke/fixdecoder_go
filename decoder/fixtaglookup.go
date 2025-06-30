@@ -11,6 +11,8 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
+var chooseEmbeddedXML = fix.ChooseEmbeddedXML
+
 type rawFix struct {
 	Fields []struct {
 		XMLName xml.Name `xml:"field"`
@@ -175,9 +177,8 @@ var schemaToXMLID = map[string]string{
 	"FIXT11":   "T11",
 }
 
-// getDictionary lazily builds (and memoises) a FixTagLookup for key.
 func getDictionary(key string) *FixTagLookup {
-	// Fast path: read lock.
+	// Fast path: read lock
 	dictMux.RLock()
 	if d, ok := dicts[key]; ok {
 		dictMux.RUnlock()
@@ -185,36 +186,32 @@ func getDictionary(key string) *FixTagLookup {
 	}
 	dictMux.RUnlock()
 
-	// Slow path: upgrade to write lock and build if still absent.
-	dictMux.Lock()
-	defer dictMux.Unlock()
-
-	if d, ok := dicts[key]; ok { // double-check
-		return d
-	}
-
+	// Lookup XML ID
 	xmlID, ok := schemaToXMLID[key]
 	if !ok {
 		return nil
 	}
 
-	xmlBytes := fix.ChooseEmbeddedXML(xmlID)
-
-	// parseDictionary expects string
-	d, err := parseDictionary(string(xmlBytes))
+	// Parse dictionary without holding lock
+	xmlBytes := chooseEmbeddedXML(xmlID)
+	parsed, err := parseDictionary(xmlBytes)
 	if err != nil {
 		return nil
 	}
 
-	// For FIX ≥ 5.0 add admin/session tags from FIXT 1.1.
+	// Write to cache under lock
+	dictMux.Lock()
+	dicts[key] = parsed
+	dictMux.Unlock()
+
+	// Merge FIXT11 session tags if needed
 	if key == "FIX50" || key == "FIX50SP1" || key == "FIX50SP2" {
 		if t11 := getDictionary("FIXT11"); t11 != nil {
-			mergeLookups(d, t11)
+			mergeLookups(parsed, t11)
 		}
 	}
 
-	dicts[key] = d
-	return d
+	return parsed
 }
 
 /* ---------- PUBLIC API ---------- */

@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+var (
+	loadDictionary = LoadDictionary
+	parseFix       = ParseFix
+	streamLogFunc  = streamLog
+)
+
 const (
 	ColourReset = "\033[0m"
 	ColourLine  = "\033[38;5;244m"
@@ -23,9 +29,9 @@ const (
 func Prettify(msg string) string {
 	var sb strings.Builder
 
-	dict := LoadDictionary(msg)
+	dict := loadDictionary(msg)
 
-	for _, fv := range ParseFix(msg) {
+	for _, fv := range parseFix(msg) {
 		name := dict.GetFieldName(fv.Tag)
 		desc := dict.GetEnumDescription(fv.Tag, fv.Value)
 
@@ -51,7 +57,7 @@ func PrettifyFiles(paths []string, out io.Writer, errOut io.Writer) int {
 
 	// 1) If no paths at all, default to stdin (unchanged behaviour)
 	if len(paths) == 0 {
-		if err := streamLog(os.Stdin, out); err != nil {
+		if err := streamLogFunc(os.Stdin, out); err != nil {
 			fmt.Fprintln(errOut, ColourError+"Error reading input:"+err.Error()+ColourReset)
 			return 1
 		}
@@ -85,7 +91,7 @@ func PrettifyFiles(paths []string, out io.Writer, errOut io.Writer) int {
 			r, c = f, f // will close after streaming
 		}
 
-		if err = streamLog(r, out); err != nil {
+		if err = streamLogFunc(r, out); err != nil {
 			fmt.Fprintln(errOut, ColourError+"Error reading file:"+err.Error()+ColourReset)
 			hadError = true
 		}
