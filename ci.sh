@@ -150,13 +150,13 @@ function integration_tests() {
 }
 
 function code_scan() {
-  if [[ -n "$BITBUCKET_BUILD_NUMBER" ]]; then
+  if [[ -n "${BITBUCKET_BUILD_NUMBER:-}" ]]; then
     log_message ">> Skipping SonarQube scan in Bitbucket Pipelines"
     code_scan=true
     return
   fi
 
-  if [[ $code_scan == true ]]; then
+  if [[ "${code_scan:-false}" == true ]]; then
     return
   fi
 

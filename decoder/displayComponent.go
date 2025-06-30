@@ -31,39 +31,6 @@ func printMatchingEnum(values []Value, want string, indent int) {
 	}
 }
 
-func DisplayComponent(schema SchemaTree, msg MessageNode, comp ComponentNode, verbose bool, columnOutput bool, indent int) {
-	printIndent(indent)
-	fmt.Printf("Component: %s\n", comp.Name)
-
-	for _, f := range comp.Fields {
-		printField(f, indent+4)
-
-		// Decide if we need to print the enums
-		if verbose {
-			if f.Field.Number == 35 {
-				// For MsgType (35), print only the enum that matches msg.MsgType.
-				printMatchingEnum(f.Field.Values, msg.MsgType, indent+6)
-			} else {
-				if columnOutput {
-					printEnumColumns(f.Field.Values, indent+6)
-				} else {
-					for _, v := range f.Field.Values {
-						printEnumFunc(v.Enum, v.Description, indent+6)
-					}
-				}
-			}
-		}
-	}
-
-	for _, c := range comp.Components {
-		DisplayComponent(schema, msg, c, verbose, columnOutput, indent+4)
-	}
-
-	for _, g := range comp.Groups {
-		DisplayGroup(schema, g, verbose, columnOutput, indent+4)
-	}
-}
-
 // printComponents prints all nested components of the message.
 func printComponents(schema SchemaTree, msg MessageNode, verbose, column bool, indent int) {
 	for _, c := range msg.Components {
@@ -90,5 +57,42 @@ func printTrailer(schema SchemaTree, msg MessageNode, includeTrailer, verbose, c
 
 	if trailerComp, ok := schema.Components["Trailer"]; ok {
 		DisplayComponent(schema, msg, trailerComp, verbose, column, indent)
+	}
+}
+
+func DisplayComponent(schema SchemaTree, msg MessageNode, comp ComponentNode, verbose bool, columnOutput bool, indent int) {
+	printIndent(indent)
+	fmt.Printf("Component: %s\n", comp.Name)
+
+	for _, f := range comp.Fields {
+		printField(f, indent+4)
+		if verbose {
+			printEnums(f, msg, columnOutput, indent+6)
+		}
+	}
+
+	for _, c := range comp.Components {
+		DisplayComponent(schema, msg, c, verbose, columnOutput, indent+4)
+	}
+
+	for _, g := range comp.Groups {
+		DisplayGroup(schema, g, verbose, columnOutput, indent+4)
+	}
+}
+
+// Helper to handle enum display logic
+func printEnums(f FieldNode, msg MessageNode, columnOutput bool, indent int) {
+	if f.Field.Number == 35 {
+		// Special case for MsgType
+		printMatchingEnum(f.Field.Values, msg.MsgType, indent)
+		return
+	}
+
+	if columnOutput {
+		printEnumColumns(f.Field.Values, indent)
+	} else {
+		for _, v := range f.Field.Values {
+			printEnumFunc(v.Enum, v.Description, indent)
+		}
 	}
 }
