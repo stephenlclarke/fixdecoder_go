@@ -18,4 +18,4 @@ reports/
 resources/*.xml
 
 # Build artifacts
-fixdecoder
+bin/
