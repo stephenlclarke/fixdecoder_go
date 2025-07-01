@@ -11,7 +11,7 @@
 # in build.sh:  setup_environment → install_dependencies → tidy → generate_fix
 # ---------------------------------------------------------------------------
 
-set -euo pipefail
+set -eo pipefail
 
 # ──────────────────────────────────────────────────────────────
 #  Constants
@@ -32,7 +32,6 @@ MODULES=(
 )
 
 declare common_preparation=false
-declare compile_binary=false
 declare unit_tests=false
 declare integration_tests=false
 declare code_scan=false
@@ -108,10 +107,6 @@ function unit_tests() {
 }
 
 function compile_binary() {
-  if [[ $compile_binary == true ]]; then
-    return
-  fi
-
   # ensure the bin directory exists
   mkdir -p ./bin
 
@@ -119,7 +114,7 @@ function compile_binary() {
   git fetch --tags
 
   # grab the latest tag and construct a version string (e.g. "v1.2.3")
-  TAG=$(git describe --tags --abbrev=0 2>/dev/null)
+  TAG=$(bin/>/dev/null)
   VERSION=${TAG:="v0.0.0"}
   git status --porcelain >/dev/null 2>&1 && VERSION="${VERSION}-dirty"
 
@@ -130,10 +125,21 @@ function compile_binary() {
 
   log_message ">> Building the application ${VERSION} (branch: ${BRANCH}, commit: ${SHORT_SHA})"
 
-  # build with that version baked in
-  go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.Url=${URL}" -o ./bin/fixdecoder ./cmd/fixdecoder
+  OS=${1:-$(go env GOOS)}
+  ARCH=${2:-$(go env GOARCH)}
+  BUILD_TAG=""
 
-  compile_binary=true
+  if [[ -z "$1" || -z "$2" ]]; then
+    log_message ">> Using default OS: ${OS}, ARCH: ${ARCH}"
+  else
+    log_message ">> Building for OS: ${OS}, ARCH: ${ARCH}"
+
+    BUILD_TAG="-${OS}-${ARCH}-${VERSION//./-}"
+  fi
+
+
+  # build with that version baked in
+  env GOOS=${OS} GOARCH=${ARCH} go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.Url=${URL}" -o ./bin/fixdecoder${BUILD_TAG} ./cmd/fixdecoder
 }
 
 function integration_tests() {
@@ -198,6 +204,14 @@ for target in "$@"; do
     build)
       common_preparation
       compile_binary
+      ;;
+    build-all)
+      common_preparation
+      compile_binary
+      compile_binary darwin arm64
+      compile_binary linux arm64
+      compile_binary linux amd64
+      compile_binary windows amd64
       ;;
     unit-test)
       common_preparation
