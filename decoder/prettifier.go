@@ -75,10 +75,10 @@ func PrettifyFiles(paths []string, out io.Writer, errOut io.Writer) int {
 		)
 
 		if path == "-" {
-			fmt.Fprint(out, "\nProcessing: (stdin)\n\n")
+			fmt.Fprint(out, "Processing: (stdin)\n\n")
 			r = os.Stdin // read from pipe/tty
 		} else {
-			fmt.Fprint(out, "\nProcessing: ", ColourFile, path, ColourReset, "\n\n")
+			fmt.Fprint(out, "Processing: ", ColourFile, path, ColourReset, "\n\n")
 
 			var f *os.File
 			f, err = os.Open(path)
