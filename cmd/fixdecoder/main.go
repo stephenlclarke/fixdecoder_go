@@ -88,6 +88,7 @@ func parseFlagsArgs(args []string) CLIOptions {
 		PrintUsage()
 		fmt.Println("\nFlags:")
 		fs.PrintDefaults()
+		os.Exit(0)
 	}
 
 	fs.Parse(args)
