@@ -5,6 +5,15 @@ definitions:
     go: go
 
   steps:
+    - step: &commit_message_lint
+      image: node:20
+      name: Commit Message Lint (Conventional Commits)
+      caches:
+        - node
+      script:
+        - npm ci
+        - npx commitlint --from=origin/${BITBUCKET_PR_DESTINATION_BRANCH:-main}
+
     - step: &security_scan
         name: Security Scan
         script:
@@ -83,3 +92,13 @@ pipelines:
       - step: *unit-tests
       - step: *integration-tests
       - step: *sonar_analysis
+
+  pull-requests:
+    '**':
+      - step:
+          name: Commit Message Lint (Conventional Commits)
+          caches:
+            - node
+          script:
+            - npm ci
+            - npx commitlint --from=origin/${BITBUCKET_PR_DESTINATION_BRANCH:-main}
