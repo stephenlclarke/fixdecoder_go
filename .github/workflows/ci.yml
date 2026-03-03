@@ -45,6 +45,10 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
       - name: Lint workflow YAML
         run: |
           python3 -m pip install --upgrade pip
@@ -290,6 +294,10 @@ jobs:
       FIXDECODER_GIT_URL: https://github.com/${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
       - name: Compute lockfile hash
         id: lockfile-hash
         shell: bash
