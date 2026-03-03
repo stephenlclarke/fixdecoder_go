@@ -12,6 +12,13 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      run_release_matrix:
+        description: "Run release build matrix (cross-platform)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -19,7 +26,7 @@ permissions:
 jobs:
   dictionaries:
     name: Prepare FIX specs
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     steps:
       - uses: actions/checkout@v4
       - name: Download FIX XML dictionaries
@@ -33,9 +40,9 @@ jobs:
 
   quality:
     name: Lint & Coverage
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     needs: dictionaries
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - name: Lint workflow YAML
@@ -85,7 +92,16 @@ jobs:
             ${{ runner.os }}-cargo-
       - name: Ensure make is installed (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y make
+        shell: bash
+        run: |
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y make
+          elif [ "$(id -u)" -eq 0 ]; then
+            apt-get update && apt-get install -y make
+          else
+            echo "Cannot install make: need sudo or root privileges." >&2
+            exit 1
+          fi
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
@@ -124,9 +140,9 @@ jobs:
 
   sonar:
     name: Sonar (coverage import)
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     needs: [quality]
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - name: Determine toolchain channel
@@ -171,12 +187,20 @@ jobs:
           name: clippy-json
           path: target
       - name: Install Rust (for Clippy sensor)
+        shell: bash
         run: |
           CARGO_HOME="${HOME}/.cargo"
           RUSTUP_HOME="${HOME}/.rustup"
           mkdir -p "$CARGO_HOME" "$RUSTUP_HOME"
           echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
-          apt-get update && apt-get install -y curl ca-certificates build-essential
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y curl ca-certificates build-essential
+          elif [ "$(id -u)" -eq 0 ]; then
+            apt-get update && apt-get install -y curl ca-certificates build-essential
+          else
+            echo "Cannot install Rust prerequisites: need sudo or root privileges." >&2
+            exit 1
+          fi
           curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain ${{ steps.toolchain-id.outputs.toolchain }}
           "$CARGO_HOME/bin/rustup" component add clippy
       - name: Run sonar-scanner
@@ -205,7 +229,7 @@ jobs:
             "${PR_OPTS[@]}"
 
   build-matrix:
-    name: Build release (tags only)
+    name: Build release (tags/manual)
     strategy:
       fail-fast: true
       matrix:
@@ -220,9 +244,9 @@ jobs:
             artifact_path: target/x86_64-apple-darwin/release/fixdecoder
             asset_suffix: darwin-x86_64
             ext: ""
-          - os: ubuntu-latest
+          - os: arc-runner-set
             target: aarch64-unknown-linux-gnu
-            setup: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+            setup_packages: gcc-aarch64-linux-gnu
             linker: aarch64-linux-gnu-gcc
             artifact_path: target/aarch64-unknown-linux-gnu/release/fixdecoder
             asset_suffix: linux-gnu-arm64
@@ -237,27 +261,29 @@ jobs:
             artifact_path: target/aarch64-pc-windows-msvc/release/fixdecoder.exe
             asset_suffix: windows-arm64
             ext: ".exe"
-          - os: ubuntu-latest
+          - os: arc-runner-set
             target: x86_64-unknown-linux-gnu
             artifact_path: target/x86_64-unknown-linux-gnu/release/fixdecoder
             asset_suffix: linux-gnu-x86_64
             ext: ""
-          - os: ubuntu-latest
+          - os: arc-runner-set
             target: x86_64-unknown-linux-musl
-            setup: sudo apt-get update && sudo apt-get install -y musl-tools
+            setup_packages: musl-tools
             artifact_path: target/x86_64-unknown-linux-musl/release/fixdecoder
             asset_suffix: linux-musl-x86_64
             ext: ""
-          - os: ubuntu-latest
+          - os: arc-runner-set
             target: x86_64-pc-windows-gnu
-            setup: sudo apt-get update && sudo apt-get install -y mingw-w64
+            setup_packages: mingw-w64
             linker: x86_64-w64-mingw32-gcc
             artifact_path: target/x86_64-pc-windows-gnu/release/fixdecoder.exe
             asset_suffix: windows-gnu-x86_64
             ext: ".exe"
     runs-on: ${{ matrix.os }}
     needs: [dictionaries]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_release_matrix)
     env:
       FIXDECODER_BRANCH: ${{ github.ref_name }}
       FIXDECODER_COMMIT: ${{ github.sha }}
@@ -298,8 +324,19 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-cargo-
             ${{ runner.os }}-cargo-
       - name: Install target dependencies
-        if: ${{ matrix.setup != '' }}
-        run: ${{ matrix.setup }}
+        if: ${{ matrix.setup_packages && matrix.setup_packages != '' }}
+        shell: bash
+        run: |
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ${{ matrix.setup_packages }}
+          elif [ "$(id -u)" -eq 0 ]; then
+            apt-get update
+            apt-get install -y ${{ matrix.setup_packages }}
+          else
+            echo "Cannot install target dependencies: need sudo or root privileges." >&2
+            exit 1
+          fi
       - name: Prepare build inputs
         shell: bash
         run: |
@@ -345,7 +382,7 @@ jobs:
 
   packaging-manifests:
     name: Render packaging manifests (tags only)
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     needs: [build-matrix]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -434,7 +471,7 @@ jobs:
 
   release:
     name: Publish Release
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     needs: [build-matrix, packaging-manifests]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
