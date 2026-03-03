@@ -504,4 +504,5 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag_name }}
           name: Version ${{ steps.version.outputs.version }}
+          generate_release_notes: true
           files: dist/*
