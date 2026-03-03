@@ -1,6 +1,6 @@
 #!/bin/bash
 # fixdecoder — FIX protocol decoder tools
-# Copyright (C) 2025 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+# Copyright (C) 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by

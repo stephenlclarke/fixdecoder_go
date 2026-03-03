@@ -5,6 +5,16 @@ edition = "2021"
 license = "AGPL-3.0-only"
 description = "PCAP to FIX stream filter: reassembles TCP payloads and emits FIX messages"
 repository = "https://github.com/stephenlclarke/fixdecoder2"
+readme = "README.md"
+keywords = ["fix", "pcap", "trading", "network", "decoder"]
+categories = ["command-line-utilities", "network-programming", "parser-implementations"]
+rust-version = "1.91"
+include = [
+    "src/**",
+    "tests/**",
+    "Cargo.toml",
+    "README.md",
+]
 
 [dependencies]
 anyhow = "1.0"

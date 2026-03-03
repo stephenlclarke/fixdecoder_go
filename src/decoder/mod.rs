@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// SPDX-FileCopyrightText: 2025 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
 
 pub mod colours;
 pub mod display;
@@ -9,6 +9,7 @@ pub mod prettifier;
 pub mod schema;
 pub mod summary;
 pub mod tag_lookup;
+pub mod ui;
 pub mod validator;
 
 pub use display::{

@@ -2,8 +2,16 @@
 
 SHELL := /bin/bash
 CI_SCRIPT := ./ci/ci_helper.sh
+ZIG := $(shell command -v zig 2>/dev/null)
 
-.PHONY: setup-environment prepare build build-release scan coverage sonar release clean help
+.PHONY: setup-environment prepare build build-release build-release-all scan coverage sonar release clean help
+.PHONY: test-unit test-integration test-all
+
+# Common cross targets (override ALL_TARGETS to customize). Canonical release set:
+#  - Linux: x86_64-gnu, x86_64-musl, aarch64-gnu
+#  - macOS: x86_64, aarch64
+#  - Windows: x86_64-gnu, x86_64-msvc, aarch64-msvc
+ALL_TARGETS ?= x86_64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu x86_64-pc-windows-msvc aarch64-pc-windows-msvc
 
 setup-environment:
 	@bash -lc 'source $(CI_SCRIPT) && cmd_setup_environment'
@@ -17,6 +25,39 @@ build: prepare
 
 build-release: prepare
 	@bash -lc 'source $(CI_SCRIPT) && ensure_build_metadata && cargo fmt --all && cargo build --workspace --release'
+
+build-release-all: prepare
+	@bash -lc '\
+		source $(CI_SCRIPT) && ensure_build_metadata && cargo fmt --all; \
+		if [[ -n "$(ZIG)" ]]; then \
+			echo ">> Using zig for cross-linking where applicable"; \
+			mkdir -p target/zig-linkers; \
+			make_wrap() { \
+				local tgt="$$1"; local kind="$$2"; local file="target/zig-linkers/zig-$$tgt-$$kind"; \
+				echo "#!/usr/bin/env bash" > $$file; \
+				if [[ $$kind == "cc" ]]; then \
+					echo "exec \"$(ZIG)\" cc -target $$tgt \"\$$@\"" >> $$file; \
+				else \
+					echo "exec \"$(ZIG)\" ar \"\$$@\"" >> $$file; \
+				fi; \
+				chmod +x $$file; \
+				echo $$file; \
+			}; \
+			export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=$$(make_wrap x86_64-linux-gnu cc); \
+			export AR_x86_64_unknown_linux_gnu=$$(make_wrap x86_64-linux-gnu ar); \
+			export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=$$(make_wrap aarch64-linux-gnu cc); \
+			export AR_aarch64_unknown_linux_gnu=$$(make_wrap aarch64-linux-gnu ar); \
+			export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=$$(make_wrap x86_64-windows-gnu cc); \
+			export AR_x86_64_pc_windows_gnu=$$(make_wrap x86_64-windows-gnu ar); \
+		else \
+			echo ">> zig not found; cross targets may require platform toolchains in PATH"; \
+		fi; \
+		for tgt in $(ALL_TARGETS); do \
+			echo ">> Building --release for target $$tgt"; \
+			rustup target add $$tgt >/dev/null 2>&1 || true; \
+			cargo build --workspace --release --target $$tgt || exit $$?; \
+		done \
+	'
 
 scan: prepare
 	@bash -lc '\
@@ -56,6 +97,8 @@ coverage: build
 		ensure_build_metadata && \
 		mkdir -p target/coverage && \
 		cargo llvm-cov clean --workspace >/dev/null 2>&1 || true; \
+		CPU_CORES=$$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || printf "4"); \
+		RUST_TEST_THREADS=$$CPU_CORES \
 		cargo llvm-cov \
 		  --package fixdecoder \
 		  --package pcap2fix \
@@ -63,6 +106,24 @@ coverage: build
 		  --ignore-filename-regex "src/fix/sensitive.rs|src/bin/generate_sensitive_tags.rs" \
 		  --output-path target/coverage/coverage.xml \
 	'
+
+test-unit:
+	@bash -lc '\
+		source $(CI_SCRIPT) && \
+		ensure_build_metadata && \
+		cargo test --bins \
+	'
+
+test-integration:
+	@bash -lc '\
+		source $(CI_SCRIPT) && \
+		ensure_build_metadata && \
+		cargo test --tests \
+	'
+
+test-all:
+	@$(MAKE) test-unit
+	@$(MAKE) test-integration
 
 sonar:
 	@bash -lc '\
@@ -119,6 +180,7 @@ help:
 	@echo "  prepare            → setup + build metadata + download FIX specs + regenerate generators"
 	@echo "  build              → fmt + cargo build (debug)"
 	@echo "  build-release      → fmt + cargo build --release"
+	@echo "  build-release-all  → fmt + cargo build --release for ALL_TARGETS ($(ALL_TARGETS))"
 	@echo "  scan               → fmt --check + clippy (+ cargo-audit when available)"
 	@echo "  coverage           → cargo llvm-cov --cobertura"
 	@echo "  sonar              → sonar-scanner (requires coverage.xml)"

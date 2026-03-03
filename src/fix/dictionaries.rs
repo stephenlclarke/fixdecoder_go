@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// SPDX-FileCopyrightText: 2025 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
 
 const FIX40_XML: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/FIX40.xml"));
 const FIX41_XML: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/FIX41.xml"));

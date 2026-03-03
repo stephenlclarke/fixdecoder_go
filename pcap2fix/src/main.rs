@@ -10,11 +10,16 @@ use pcap_parser::pcapng::Block;
 use pcap_parser::traits::{PcapNGPacketBlock, PcapReaderIterator};
 use pcap_parser::{create_reader, Linktype, PcapBlockOwned};
 use std::collections::HashMap;
+use std::env;
 use std::fs::File;
-use std::io::{self, Write};
-use std::net::Ipv4Addr;
+use std::io::{self, Read, Write};
+use std::net::{IpAddr, Ipv6Addr};
 use std::time::{Duration, Instant};
 use thiserror::Error;
+
+const DEBUG_PCAP_PATH: &str = "/tmp/pcap_debug.in";
+const DEBUG_FIX_PATH: &str = "/tmp/fix_debug.out";
+const DEBUG_LOG_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -34,12 +39,15 @@ struct Args {
     /// Idle timeout for flows (seconds)
     #[arg(long, default_value = "60")]
     idle_timeout: u64,
+    /// Write raw PCAP and decoded FIX to debug files
+    #[arg(long, default_value_t = false)]
+    debug: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct FlowKey {
-    src: Ipv4Addr,
-    dst: Ipv4Addr,
+    src: IpAddr,
+    dst: IpAddr,
     sport: u16,
     dport: u16,
     // direction handled by seq tracking in FlowState
@@ -68,18 +76,49 @@ enum ReassemblyError {
     Overflow,
 }
 
+fn env_debug_enabled() -> bool {
+    match env::var("PCAP2FIX_DEBUG") {
+        Ok(val) => {
+            let v = val.trim().to_ascii_lowercase();
+            if v.is_empty() {
+                true
+            } else {
+                !matches!(v.as_str(), "0" | "false" | "no" | "off")
+            }
+        }
+        Err(_) => false,
+    }
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
+    let debug = args.debug || env_debug_enabled();
     let delimiter = parse_delimiter(&args.delimiter)?;
-    let mut reader = open_reader(&args.input)?;
+    let mut reader = open_reader(&args.input, debug)?;
 
     let mut flows: HashMap<FlowKey, FlowState> = HashMap::new();
     let idle = Duration::from_secs(args.idle_timeout);
-    let mut stdout = io::BufWriter::new(io::stdout().lock());
+    let stdout = io::BufWriter::new(io::stdout().lock());
+    let mut debug_out: Option<io::BufWriter<File>> = None;
+    if debug {
+        let dbg_file = File::create(DEBUG_FIX_PATH)
+            .with_context(|| format!("failed to create debug output at {DEBUG_FIX_PATH}"))?;
+        debug_out = Some(io::BufWriter::new(dbg_file));
+        eprintln!("debug mode enabled: PCAP -> {DEBUG_PCAP_PATH}, decoded FIX -> {DEBUG_FIX_PATH}");
+    }
+    let mut stdout_writer: Box<dyn Write> = if let Some(debug_file) = debug_out {
+        Box::new(TeeWriter::new(stdout, debug_file))
+    } else {
+        Box::new(stdout)
+    };
     let mut scratch = Vec::new();
     let mut legacy_linktype = None;
     let mut idb_linktypes: HashMap<u32, Linktype> = HashMap::new();
     let mut next_if_id: u32 = 0;
+    let mut packet_count: u64 = 0;
+    let mut byte_count: u64 = 0;
+    let mut fix_count: u64 = 0;
+    let mut last_log = Instant::now();
 
     loop {
         match reader.next() {
@@ -94,15 +133,22 @@ fn main() -> Result<()> {
                             if let Some(packet) =
                                 get_packetdata(b.data, linktype, b.caplen as usize)
                             {
-                                if let Err(err) = handle_packet_data(
+                                match handle_packet_data(
                                     packet,
                                     args.port,
                                     delimiter,
                                     args.max_flow_bytes,
                                     &mut flows,
-                                    &mut stdout,
+                                    stdout_writer.as_mut(),
                                 ) {
-                                    eprintln!("warn: skipping packet: {err}");
+                                    Ok(messages) => {
+                                        packet_count += 1;
+                                        byte_count += b.caplen as u64;
+                                        fix_count += messages as u64;
+                                    }
+                                    Err(err) => {
+                                        eprintln!("warn: skipping packet: {err}");
+                                    }
                                 }
                             }
                         }
@@ -122,15 +168,22 @@ fn main() -> Result<()> {
                                         *linktype,
                                         epb.caplen as usize,
                                     ) {
-                                        if let Err(err) = handle_packet_data(
+                                        match handle_packet_data(
                                             packet,
                                             args.port,
                                             delimiter,
                                             args.max_flow_bytes,
                                             &mut flows,
-                                            &mut stdout,
+                                            stdout_writer.as_mut(),
                                         ) {
-                                            eprintln!("warn: skipping packet: {err}");
+                                            Ok(messages) => {
+                                                packet_count += 1;
+                                                byte_count += epb.caplen as u64;
+                                                fix_count += messages as u64;
+                                            }
+                                            Err(err) => {
+                                                eprintln!("warn: skipping packet: {err}");
+                                            }
                                         }
                                     }
                                 }
@@ -142,15 +195,22 @@ fn main() -> Result<()> {
                                         *linktype,
                                         spb.origlen as usize,
                                     ) {
-                                        if let Err(err) = handle_packet_data(
+                                        match handle_packet_data(
                                             packet,
                                             args.port,
                                             delimiter,
                                             args.max_flow_bytes,
                                             &mut flows,
-                                            &mut stdout,
+                                            stdout_writer.as_mut(),
                                         ) {
-                                            eprintln!("warn: skipping packet: {err}");
+                                            Ok(messages) => {
+                                                packet_count += 1;
+                                                byte_count += spb.origlen as u64;
+                                                fix_count += messages as u64;
+                                            }
+                                            Err(err) => {
+                                                eprintln!("warn: skipping packet: {err}");
+                                            }
                                         }
                                     }
                                 }
@@ -161,6 +221,13 @@ fn main() -> Result<()> {
                 }
                 reader.consume(offset);
                 evict_idle(&mut flows, idle);
+                if debug && last_log.elapsed() >= DEBUG_LOG_INTERVAL {
+                    eprintln!(
+                        "debug stats: packets={} bytes={} fix_messages={}",
+                        packet_count, byte_count, fix_count
+                    );
+                    last_log = Instant::now();
+                }
             }
             Err(pcap_parser::PcapError::Eof) => break,
             Err(pcap_parser::PcapError::Incomplete) => {
@@ -175,19 +242,56 @@ fn main() -> Result<()> {
 
     // flush any trailing message fragments (best effort)
     for flow in flows.values_mut() {
-        flush_complete_messages(&mut flow.buffer, delimiter, &mut scratch, &mut stdout)?;
+        flush_complete_messages(
+            &mut flow.buffer,
+            delimiter,
+            &mut scratch,
+            stdout_writer.as_mut(),
+        )?;
     }
-    stdout.flush()?;
+    stdout_writer.flush()?;
     Ok(())
 }
 
-fn open_reader(path: &str) -> Result<Box<dyn PcapReaderIterator>> {
+fn open_reader(path: &str, debug: bool) -> Result<Box<dyn PcapReaderIterator>> {
     if path == "-" {
         let stdin = io::stdin();
-        create_reader(65536, stdin).map_err(|e| anyhow!("failed to create reader: {e}"))
+        if debug {
+            let dbg = File::create(DEBUG_PCAP_PATH)
+                .with_context(|| format!("failed to write debug PCAP to {DEBUG_PCAP_PATH}"))?;
+            create_reader(65536, TeeReader::new(stdin.lock(), dbg))
+                .map_err(|e| anyhow!("failed to create reader: {e}"))
+        } else {
+            create_reader(65536, stdin).map_err(|e| anyhow!("failed to create reader: {e}"))
+        }
     } else {
         let file = File::open(path).with_context(|| format!("open pcap {path}"))?;
+        if debug {
+            std::fs::copy(path, DEBUG_PCAP_PATH)
+                .with_context(|| format!("failed to write debug PCAP to {DEBUG_PCAP_PATH}"))?;
+        }
         create_reader(65536, file).map_err(|e| anyhow!("failed to create reader: {e}"))
+    }
+}
+
+struct TeeReader<R: Read, W: Write> {
+    reader: R,
+    debug: W,
+}
+
+impl<R: Read, W: Write> TeeReader<R, W> {
+    fn new(reader: R, debug: W) -> Self {
+        Self { reader, debug }
+    }
+}
+
+impl<R: Read, W: Write> Read for TeeReader<R, W> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let n = self.reader.read(buf)?;
+        if n > 0 {
+            self.debug.write_all(&buf[..n])?;
+        }
+        Ok(n)
     }
 }
 
@@ -208,14 +312,14 @@ fn parse_delimiter(raw: &str) -> Result<u8> {
     ))
 }
 
-fn handle_packet_data<W: Write>(
+fn handle_packet_data(
     packet: PacketData<'_>,
     port_filter: Option<u16>,
     delimiter: u8,
     max_flow_bytes: usize,
     flows: &mut HashMap<FlowKey, FlowState>,
-    out: &mut W,
-) -> Result<()> {
+    out: &mut dyn Write,
+) -> Result<usize> {
     match packet {
         PacketData::L2(data) => {
             let sliced = SlicedPacket::from_ethernet(data).map_err(|e| anyhow!("parse: {e:?}"))?;
@@ -227,37 +331,45 @@ fn handle_packet_data<W: Write>(
             let sliced = SlicedPacket::from_ip(data).map_err(|e| anyhow!("parse: {e:?}"))?;
             handle_sliced_packet(sliced, port_filter, delimiter, max_flow_bytes, flows, out)
         }
-        _ => Ok(()),
+        _ => Ok(0),
     }
 }
 
-fn handle_sliced_packet<W: Write>(
+fn handle_sliced_packet(
     sliced: SlicedPacket<'_>,
     port_filter: Option<u16>,
     delimiter: u8,
     max_flow_bytes: usize,
     flows: &mut HashMap<FlowKey, FlowState>,
-    out: &mut W,
-) -> Result<()> {
-    let (ip, tcp) = match (sliced.net, sliced.transport) {
-        (Some(NetSlice::Ipv4(ip)), Some(TransportSlice::Tcp(tcp))) => (ip, tcp),
-        _ => return Ok(()),
+    out: &mut dyn Write,
+) -> Result<usize> {
+    let (src_ip, dst_ip, tcp) = match (sliced.net, sliced.transport) {
+        (Some(NetSlice::Ipv4(ip)), Some(TransportSlice::Tcp(tcp))) => (
+            IpAddr::V4(ip.header().source_addr()),
+            IpAddr::V4(ip.header().destination_addr()),
+            tcp,
+        ),
+        (Some(NetSlice::Ipv6(ip)), Some(TransportSlice::Tcp(tcp))) => (
+            IpAddr::V6(Ipv6Addr::from(ip.header().source())),
+            IpAddr::V6(Ipv6Addr::from(ip.header().destination())),
+            tcp,
+        ),
+        _ => return Ok(0),
     };
     if let Some(p) = port_filter {
         if tcp.source_port() != p && tcp.destination_port() != p {
-            return Ok(());
+            return Ok(0);
         }
     }
 
     let payload = tcp.payload();
     if payload.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
 
-    let header = ip.header();
     let key = FlowKey {
-        src: header.source_addr(),
-        dst: header.destination_addr(),
+        src: src_ip,
+        dst: dst_ip,
         sport: tcp.source_port(),
         dport: tcp.destination_port(),
     };
@@ -269,14 +381,14 @@ fn handle_sliced_packet<W: Write>(
     reassemble_and_emit(flow, seq, payload, delimiter, max_flow_bytes, out)
 }
 
-fn reassemble_and_emit<W: Write>(
+fn reassemble_and_emit(
     flow: &mut FlowState,
     seq: u32,
     payload: &[u8],
     delimiter: u8,
     max_flow_bytes: usize,
-    out: &mut W,
-) -> Result<()> {
+    out: &mut dyn Write,
+) -> Result<usize> {
     let expected = flow.next_seq.unwrap_or(seq);
 
     if seq == expected {
@@ -284,13 +396,13 @@ fn reassemble_and_emit<W: Write>(
         flow.next_seq = Some(seq.wrapping_add(payload.len() as u32));
     } else if seq > expected {
         // out-of-order future segment: skip for now
-        return Ok(());
+        return Ok(0);
     } else {
         // retransmit or overlap
         let end = seq.wrapping_add(payload.len() as u32);
         if end <= expected {
             // fully duplicate
-            return Ok(());
+            return Ok(0);
         }
         let overlap = (expected - seq) as usize;
         flow.buffer.extend_from_slice(&payload[overlap..]);
@@ -303,29 +415,30 @@ fn reassemble_and_emit<W: Write>(
     }
 
     let mut scratch = Vec::new();
-    flush_complete_messages(&mut flow.buffer, delimiter, &mut scratch, out)?;
-    Ok(())
+    flush_complete_messages(&mut flow.buffer, delimiter, &mut scratch, out)
 }
 
-fn flush_complete_messages<W: Write>(
+fn flush_complete_messages(
     buffer: &mut Vec<u8>,
     delimiter: u8,
     scratch: &mut Vec<u8>,
-    out: &mut W,
-) -> Result<()> {
+    out: &mut dyn Write,
+) -> Result<usize> {
     let mut cursor = 0;
+    let mut messages = 0;
     while let Some(rel_end) = find_message_end(&buffer[cursor..], delimiter) {
         let end = cursor + rel_end;
         scratch.clear();
         scratch.extend_from_slice(&buffer[cursor..=end]);
         scratch.push(b'\n'); // newline so each FIX message prints on its own line
         out.write_all(scratch)?;
+        messages += 1;
         cursor = end + 1;
     }
     if cursor > 0 {
         buffer.drain(0..cursor);
     }
-    Ok(())
+    Ok(messages)
 }
 
 fn find_message_end(buffer: &[u8], delimiter: u8) -> Option<usize> {
@@ -381,6 +494,31 @@ fn parse_decimal(bytes: &[u8]) -> Option<usize> {
 fn evict_idle(flows: &mut HashMap<FlowKey, FlowState>, idle: Duration) {
     let now = Instant::now();
     flows.retain(|_, state| now.duration_since(state.last_seen) < idle);
+}
+
+struct TeeWriter<W1: Write, W2: Write> {
+    primary: W1,
+    debug: W2,
+}
+
+impl<W1: Write, W2: Write> TeeWriter<W1, W2> {
+    fn new(primary: W1, debug: W2) -> Self {
+        Self { primary, debug }
+    }
+}
+
+impl<W1: Write, W2: Write> Write for TeeWriter<W1, W2> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        // Always attempt to write the full buffer to both sinks; return the input length.
+        self.primary.write_all(buf)?;
+        self.debug.write_all(buf)?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.primary.flush()?;
+        self.debug.flush()
+    }
 }
 
 #[cfg(test)]
@@ -445,11 +583,12 @@ mod tests {
         buf.extend_from_slice(b"extra");
         let mut out = Vec::new();
         let mut scratch = Vec::new();
-        flush_complete_messages(&mut buf, 0x01, &mut scratch, &mut out).unwrap();
+        let msgs = flush_complete_messages(&mut buf, 0x01, &mut scratch, &mut out).unwrap();
         let mut expected = build_fix_message("35=0\u{0001}", 0x01);
         expected.push(b'\n');
         assert_eq!(out, expected);
         assert_eq!(buf.as_slice(), b"extra");
+        assert_eq!(msgs, 1);
     }
 
     #[test]
@@ -481,7 +620,7 @@ mod tests {
         buf.extend_from_slice(b"partial");
         let mut scratch = Vec::new();
         let mut out = Vec::new();
-        flush_complete_messages(&mut buf, b'|', &mut scratch, &mut out).unwrap();
+        let msgs = flush_complete_messages(&mut buf, b'|', &mut scratch, &mut out).unwrap();
         let expected_out = {
             let mut v = msg1.clone();
             v.push(b'\n');
@@ -491,5 +630,33 @@ mod tests {
         };
         assert_eq!(out, expected_out);
         assert_eq!(buf, b"partial");
+        assert_eq!(msgs, 2);
+    }
+
+    #[test]
+    fn env_debug_enabled_respects_values() {
+        env::set_var("PCAP2FIX_DEBUG", "1");
+        assert!(env_debug_enabled());
+        env::set_var("PCAP2FIX_DEBUG", "true");
+        assert!(env_debug_enabled());
+        env::set_var("PCAP2FIX_DEBUG", "false");
+        assert!(!env_debug_enabled());
+        env::set_var("PCAP2FIX_DEBUG", "0");
+        assert!(!env_debug_enabled());
+        env::remove_var("PCAP2FIX_DEBUG");
+        assert!(!env_debug_enabled());
+    }
+
+    #[test]
+    fn tee_writer_writes_to_both() {
+        let mut primary = Vec::new();
+        let mut debug = Vec::new();
+        {
+            let mut tee = TeeWriter::new(&mut primary, &mut debug);
+            tee.write_all(b"hello").unwrap();
+            tee.flush().unwrap();
+        }
+        assert_eq!(primary, b"hello");
+        assert_eq!(debug, b"hello");
     }
 }

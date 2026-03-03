@@ -1,0 +1,64 @@
+class Fixdecoder < Formula
+  desc "CLI decoder and summarizer for FIX protocol messages"
+  homepage "https://github.com/stephenlclarke/fixdecoder2"
+  version "__VERSION__"
+  license "AGPL-3.0-only"
+
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/stephenlclarke/fixdecoder2/releases/download/v#{version}/fixdecoder-#{version}.darwin-arm64"
+      sha256 "__SHA256_FIXDECODER_DARWIN_ARM64__"
+
+      resource "pcap2fix" do
+        url "https://github.com/stephenlclarke/fixdecoder2/releases/download/v#{version}/pcap2fix-#{version}.darwin-arm64"
+        sha256 "__SHA256_PCAP2FIX_DARWIN_ARM64__"
+      end
+    else
+      url "https://github.com/stephenlclarke/fixdecoder2/releases/download/v#{version}/fixdecoder-#{version}.darwin-x86_64"
+      sha256 "__SHA256_FIXDECODER_DARWIN_X86_64__"
+
+      resource "pcap2fix" do
+        url "https://github.com/stephenlclarke/fixdecoder2/releases/download/v#{version}/pcap2fix-#{version}.darwin-x86_64"
+        sha256 "__SHA256_PCAP2FIX_DARWIN_X86_64__"
+      end
+    end
+  end
+
+  on_linux do
+    if Hardware::CPU.arm?
+      url "https://github.com/stephenlclarke/fixdecoder2/releases/download/v#{version}/fixdecoder-#{version}.linux-gnu-arm64"
+      sha256 "__SHA256_FIXDECODER_LINUX_GNU_ARM64__"
+
+      resource "pcap2fix" do
+        url "https://github.com/stephenlclarke/fixdecoder2/releases/download/v#{version}/pcap2fix-#{version}.linux-gnu-arm64"
+        sha256 "__SHA256_PCAP2FIX_LINUX_GNU_ARM64__"
+      end
+    else
+      url "https://github.com/stephenlclarke/fixdecoder2/releases/download/v#{version}/fixdecoder-#{version}.linux-gnu-x86_64"
+      sha256 "__SHA256_FIXDECODER_LINUX_GNU_X86_64__"
+
+      resource "pcap2fix" do
+        url "https://github.com/stephenlclarke/fixdecoder2/releases/download/v#{version}/pcap2fix-#{version}.linux-gnu-x86_64"
+        sha256 "__SHA256_PCAP2FIX_LINUX_GNU_X86_64__"
+      end
+    end
+  end
+
+  def install
+    main_bin = Dir["fixdecoder-*"].first
+    odie "fixdecoder asset missing" if main_bin.nil?
+    chmod 0o755, main_bin
+    bin.install main_bin => "fixdecoder"
+
+    resource("pcap2fix").stage do
+      pcap_bin = Dir["pcap2fix-*"].first
+      odie "pcap2fix asset missing" if pcap_bin.nil?
+      chmod 0o755, pcap_bin
+      bin.install pcap_bin => "pcap2fix"
+    end
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/fixdecoder --version")
+  end
+end

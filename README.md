@@ -68,7 +68,8 @@ You can run fixdecoder anywhere you can run a Rust binary — no extra OS depend
 
 - Dictionaries: `--xml`, `--fix`, `--info`, `--message`, `--component`, `--tag`
 - Output/layout: `--column`, `--verbose`, `--header`, `--trailer`, `--colour`, `--delimiter`
-- Processing modes: `--follow`, `--validate`, `--secret`, `--summary`
+- Processing modes: `--follow`, `--validate`, `--secret`, `--summary`, `--ui`
+- General: `--version`
 
 ### `--xml`
 
@@ -134,6 +135,19 @@ Stream input like `tail -f`. Keeps reading and decoding as new data arrives on s
 
 Track FIX order lifecycles and emit a summary instead of full decoded messages. When enabled, each message is consumed into an order tracker (keyed by `OrderID`/`ClOrdID`/`OrigClOrdID`), updating state, quantities, prices, and events. At the end (or live in `--follow` mode) it prints a concise per-order summary/footer using the chosen display delimiter. This mode suppresses the usual prettified message output; use it to monitor order state across a stream or log.
 
+### `--ui`
+
+Launch the interactive terminal UI for browsing decoded output. This mode supports raw/decoded toggling, horizontal scrolling, wrap mode, regex search, and filter dialogs for FIX tags/message types.
+
+Notes:
+
+- `--ui` does not support `--follow`.
+- Input must be provided via file arguments or piped stdin.
+
+### `--version`
+
+Print version/build information and exit.
+
 # Download it
 
 Check out the Repo's [Releases Page](https://github.com/stephenlclarke/fixdecoder2/releases) to see what versions are available for the computer you want to run it on.
@@ -142,10 +156,21 @@ Check out the Repo's [Releases Page](https://github.com/stephenlclarke/fixdecode
 
 Build it from source. This now requires `bash` version 5+ and a recent `Rust` toolchain (the project is tested with Rust 1.91+).
 
+- Native builds: no extras beyond Rust + Bash.
+- Cross‑compiling: you need linkers/sysroots for the targets you care about. Easiest is to install `zig` and let the Makefile use it for Linux/Windows GNU targets (`make build-release-all`). For Windows GNU targets you also need `mingw-w64` (for `dlltool`). Alternatively, install per-target cross toolchains and set `CARGO_TARGET_<TRIPLE>_LINKER` accordingly.
+
+Cross-toolchain quick install:
+
+- macOS: `brew install zig` and `brew install mingw-w64`
+- Linux (Debian/Ubuntu): `sudo apt update && sudo apt install -y zig mingw-w64`
+- Windows: `choco install zig` or `winget install zig.zig`; `choco install mingw` or `winget install Mingw64`
+
+Canonical release targets (local `make build-release-all` and CI tag builds): Linux (x86_64 gnu, x86_64 musl, aarch64 gnu), macOS (x86_64, aarch64), Windows (x86_64 gnu, x86_64 msvc, aarch64 msvc). Local cross-builds lean on `zig` for GNU targets; you still need `mingw-w64` for Windows GNU, `gcc-aarch64-linux-gnu` for Linux arm64, and `musl-tools` for musl. Windows MSVC targets are best built on a Windows host/runner with the MSVC toolchain installed.
+
 ```bash
 ❯ bash --version
 GNU bash, version 5.3.3(1)-release (aarch64-apple-darwin24.4.0)
-Copyright (C) 2025 Free Software Foundation, Inc.
+Copyright (C) 2026 Free Software Foundation, Inc.
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
 
 This is free software; you are free to change and redistribute it.
@@ -183,13 +208,13 @@ info: component 'llvm-tools' for target 'aarch64-apple-darwin' is up to date
 >> Ensuring FIX XML specs are present
    Compiling minimal-lexical v0.2.1
    Compiling thiserror v1.0.69
-   Compiling fixdecoder v0.3.0 (/Users/sclarke/github/fixdecoder2)
+   Compiling fixdecoder v1.0.0 (/Users/sclarke/github/fixdecoder2)
    Compiling thiserror-impl v1.0.69
    Compiling arrayvec v0.7.6
    Compiling circular v0.3.0
    Compiling etherparse v0.15.0
    Compiling nom v7.1.3
-warning: fixdecoder@0.3.0: Building fixdecoder 0.3.0 (branch:develop, commit:9f467f8) [rust:1.91.1]
+warning: fixdecoder@1.0.0: Building fixdecoder 1.0.0 (branch:develop, commit:9f467f8) [rust:1.91.1]
    Compiling rusticata-macros v4.1.0
    Compiling pcap-parser v0.14.1
    Compiling pcap2fix v0.1.0 (/Users/sclarke/github/fixdecoder2/pcap2fix)
@@ -217,7 +242,7 @@ warning: fixdecoder@0.3.0: Building fixdecoder 0.3.0 (branch:develop, commit:9f4
     Checking core-foundation-sys v0.8.7
     Checking objc2 v0.6.3
     Checking anstream v0.6.21
-   Compiling fixdecoder v0.3.0 (/Users/sclarke/github/fixdecoder2)
+   Compiling fixdecoder v1.0.0 (/Users/sclarke/github/fixdecoder2)
     Checking crossbeam-epoch v0.9.18
     Checking aho-corasick v1.1.4
     Checking normalize-line-endings v0.3.0
@@ -240,7 +265,7 @@ warning: fixdecoder@0.3.0: Building fixdecoder 0.3.0 (branch:develop, commit:9f4
     Checking wait-timeout v0.2.1
     Checking roxmltree v0.21.1
     Checking block2 v0.6.2
-warning: fixdecoder@0.3.0: Building fixdecoder 0.3.0 (branch:develop, commit:9f467f8) [rust:1.91.1]
+warning: fixdecoder@1.0.0: Building fixdecoder 1.0.0 (branch:develop, commit:9f467f8) [rust:1.91.1]
     Checking minimal-lexical v0.2.1
     Checking fastrand v2.3.0
     Checking arrayvec v0.7.6
@@ -314,7 +339,7 @@ info: cargo-llvm-cov currently setting cfg(coverage); you can opt-out it by pass
    Compiling errno v0.3.14
    Compiling regex v1.12.2
    Compiling dispatch2 v0.3.0
-   Compiling fixdecoder v0.3.0 (/Users/sclarke/github/fixdecoder2)
+   Compiling fixdecoder v1.0.0 (/Users/sclarke/github/fixdecoder2)
    Compiling once_cell v1.21.3
    Compiling termtree v0.5.1
    Compiling difflib v0.4.0
@@ -340,7 +365,7 @@ info: cargo-llvm-cov currently setting cfg(coverage); you can opt-out it by pass
    Compiling clap_derive v4.5.49
    Compiling serde_derive v1.0.228
    Compiling thiserror-impl v1.0.69
-warning: fixdecoder@0.3.0: Building fixdecoder 0.3.0 (branch:develop, commit:9f467f8) [rust:1.91.1]
+warning: fixdecoder@1.0.0: Building fixdecoder 1.0.0 (branch:develop, commit:9f467f8) [rust:1.91.1]
    Compiling circular v0.3.0
    Compiling arrayvec v0.7.6
    Compiling etherparse v0.15.0
@@ -506,7 +531,7 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
    Compiling dispatch2 v0.3.0
    Compiling iana-time-zone v0.1.64
    Compiling nom v7.1.3
-   Compiling fixdecoder v0.3.0 (/Users/sclarke/github/fixdecoder2)
+   Compiling fixdecoder v1.0.0 (/Users/sclarke/github/fixdecoder2)
    Compiling thiserror v1.0.69
    Compiling either v1.15.0
    Compiling regex-automata v0.4.13
@@ -520,7 +545,7 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
    Compiling clap_derive v4.5.49
    Compiling thiserror-impl v1.0.69
    Compiling once_cell v1.21.3
-warning: fixdecoder@0.3.0: Building fixdecoder 0.3.0 (branch:develop, commit:9f467f8) [rust:1.91.1]
+warning: fixdecoder@1.0.0: Building fixdecoder 1.0.0 (branch:develop, commit:9f467f8) [rust:1.91.1]
    Compiling circular v0.3.0
    Compiling chrono v0.4.42
    Compiling pcap-parser v0.14.1
@@ -543,8 +568,8 @@ Build the release version
 info: component 'llvm-tools' for target 'aarch64-apple-darwin' is up to date
 
 >> Ensuring FIX XML specs are present
-   Compiling fixdecoder v0.2.0 (/Users/sclarke/github/fixdecoder2)
-warning: fixdecoder@0.2.0: Building fixdecoder 0.2.0 (branch:develop, commit:7a2d535) [rust:1.91.1]
+   Compiling fixdecoder v1.0.0 (/Users/sclarke/github/fixdecoder2)
+warning: fixdecoder@1.0.0: Building fixdecoder 1.0.0 (branch:develop, commit:7a2d535) [rust:1.91.1]
     Finished `release` profile [optimized] target(s) in 2.21s
 ```
 
@@ -552,7 +577,7 @@ Run it (from the optimized build) and check the version details:
 
 ```bash
 ❯ ./target/release/fixdecoder --version
-fixdecoder 0.2.0 (branch:develop, commit:7a2d535) [rust:1.91.1]
+fixdecoder 1.0.0 (branch:develop, commit:7a2d535) [rust:1.91.1]
   git clone git@github.com:stephenlclarke/fixdecoder2.git
 ```
 
@@ -565,6 +590,7 @@ The workspace includes a helper that reassembles TCP streams from PCAP data and 
 - Live (needs tcpdump/dumpcap): `tcpdump -i eth0 -w - 'tcp port 9876' | pcap2fix --port 9876 | fixdecoder`
 - Delimiter defaults to SOH; override with `--delimiter`.
 - Flow buffers are capped (size + idle timeout) to avoid runaway memory during long captures.
+- Debug capture: enable `--debug` or set `PCAP2FIX_DEBUG=1` to tee raw PCAP to `/tmp/pcap_debug.in` and decoded FIX to `/tmp/fix_debug.out` (stderr notes paths).
 
 ![Capture and Decode](docs/capture_and_decode.png)
 
@@ -590,6 +616,6 @@ Their copyright notice and license terms are included in this repository’s
 
 ---
 
-© 2025 Steve Clarke · Released under the [AGPL-3.0 License](https://www.gnu.org/licenses/agpl-3.0.html)
+© 2026 Steve Clarke · Released under the [AGPL-3.0 License](https://www.gnu.org/licenses/agpl-3.0.html)
 
 ---

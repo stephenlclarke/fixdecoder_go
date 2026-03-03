@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// SPDX-FileCopyrightText: 2025 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
 
 use crate::decoder::schema::{ComponentDef, FixDictionary, GroupDef, Message, MessageContainer};
+#[cfg(not(test))]
+use crate::error_logger;
 use crate::fix;
 use once_cell::sync::Lazy;
+#[cfg(test)]
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
+#[cfg(not(test))]
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -220,8 +226,16 @@ impl FixTagLookup {
 
 static LOOKUPS: Lazy<RwLock<HashMap<String, Arc<FixTagLookup>>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
+static PARSED_DICTIONARIES: Lazy<RwLock<HashMap<String, Arc<FixDictionary>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 static OVERRIDE_MISS: AtomicBool = AtomicBool::new(false);
+#[cfg(not(test))]
+static OVERRIDE_MISMATCHES: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+#[cfg(test)]
+std::thread_local! {
+    static PREFER_TEST_DICTIONARY_ALIASES: Cell<bool> = const { Cell::new(false) };
+}
 
 const SESSION_KEY: &str = "FIXT11";
 
@@ -258,6 +272,20 @@ fn get_dictionary(key: &str) -> Option<Arc<FixTagLookup>> {
         return Some(existing);
     }
 
+    let dict = get_parsed_dictionary(key)?;
+    let lookup = build_lookup_from_dict(key, &dict);
+
+    let arc = Arc::new(lookup);
+    let mut guard = LOOKUPS.write().ok()?;
+    let entry = guard.entry(key.to_string()).or_insert_with(|| arc.clone());
+    Some(entry.clone())
+}
+
+fn get_parsed_dictionary(key: &str) -> Option<Arc<FixDictionary>> {
+    if let Some(existing) = PARSED_DICTIONARIES.read().ok()?.get(key).cloned() {
+        return Some(existing);
+    }
+
     let xml_id = schema_to_xml_id(key)?;
     let xml = fix::choose_embedded_xml(xml_id);
     let dict = match FixDictionary::from_xml(xml) {
@@ -267,10 +295,8 @@ fn get_dictionary(key: &str) -> Option<Arc<FixTagLookup>> {
             return None;
         }
     };
-    let lookup = build_lookup_from_dict(key, &dict);
-
-    let arc = Arc::new(lookup);
-    let mut guard = LOOKUPS.write().ok()?;
+    let arc = Arc::new(dict);
+    let mut guard = PARSED_DICTIONARIES.write().ok()?;
     let entry = guard.entry(key.to_string()).or_insert_with(|| arc.clone());
     Some(entry.clone())
 }
@@ -320,6 +346,12 @@ fn appl_ver_to_schema(value: &str) -> Option<&'static str> {
 
 pub fn load_dictionary(msg: &str) -> Arc<FixTagLookup> {
     let key = detect_schema_key(msg);
+    #[cfg(test)]
+    if prefer_test_dictionary_aliases()
+        && let Some(test_dict) = get_dictionary(&format!("{key}_TEST"))
+    {
+        return test_dict;
+    }
     get_dictionary(&key)
         .or_else(|| get_dictionary("FIX44"))
         .expect("FIX44 dictionary available")
@@ -329,12 +361,36 @@ pub fn load_dictionary(msg: &str) -> Arc<FixTagLookup> {
 pub fn load_dictionary_with_override(msg: &str, override_key: Option<&str>) -> Arc<FixTagLookup> {
     if let Some(key) = override_key {
         let detected_key = detect_schema_key(msg);
+        let matches_detected = override_matches_detected(key, &detected_key);
+        #[cfg(not(test))]
+        if !matches_detected {
+            let combo = format!("{key}->{detected_key}");
+            if let Ok(mut seen) = OVERRIDE_MISMATCHES.lock()
+                && seen.insert(combo.clone())
+            {
+                error_logger::log_error(&format!(
+                    "FIX override '{}' does not match detected BeginString '{}'; using override with detected fallback",
+                    key, detected_key
+                ));
+            }
+        }
+        if !matches_detected {
+            warn_override_miss();
+        }
         let combo_key = format!("{key}+{detected_key}");
         if let Some(existing) = LOOKUPS.read().ok().and_then(|l| l.get(&combo_key).cloned()) {
             return existing;
         }
 
         if let Some(dict) = get_dictionary(key) {
+            #[cfg(test)]
+            if prefer_test_dictionary_aliases()
+                && key
+                    .strip_suffix("_TEST")
+                    .is_some_and(|stripped| stripped.eq_ignore_ascii_case(&detected_key))
+            {
+                return dict;
+            }
             let fallback = load_dictionary(msg);
             if Arc::ptr_eq(&dict, &fallback) {
                 return dict;
@@ -345,6 +401,7 @@ pub fn load_dictionary_with_override(msg: &str, override_key: Option<&str>) -> A
             }
             return merged;
         }
+        #[cfg(not(test))]
         eprintln!(
             "warning: FIX override '{}' not found; falling back to auto-detected dictionary",
             key
@@ -354,8 +411,35 @@ pub fn load_dictionary_with_override(msg: &str, override_key: Option<&str>) -> A
     load_dictionary(msg)
 }
 
+fn override_matches_detected(override_key: &str, detected_key: &str) -> bool {
+    if override_key.eq_ignore_ascii_case(detected_key) {
+        return true;
+    }
+    #[cfg(test)]
+    {
+        if let Some(stripped) = override_key.strip_suffix("_TEST") {
+            return stripped.eq_ignore_ascii_case(detected_key);
+        }
+    }
+    false
+}
+
 fn warn_override_miss() {
     OVERRIDE_MISS.store(true, Ordering::Relaxed);
+}
+
+#[cfg(test)]
+fn prefer_test_dictionary_aliases() -> bool {
+    PREFER_TEST_DICTIONARY_ALIASES.with(|flag| flag.get())
+}
+
+#[cfg(test)]
+fn set_prefer_test_dictionary_aliases(enabled: bool) -> bool {
+    PREFER_TEST_DICTIONARY_ALIASES.with(|flag| {
+        let prev = flag.get();
+        flag.set(enabled);
+        prev
+    })
 }
 
 fn merge_with_fallback(
@@ -713,86 +797,50 @@ mod tests {
     use super::*;
     use crate::decoder::schema::FixDictionary;
     use once_cell::sync::Lazy;
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Mutex, OnceLock};
 
     static LOOKUP_TEST_GUARD: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
-    struct LookupCacheGuard {
-        originals: Vec<(String, Option<Arc<FixTagLookup>>)>,
+    static TEST_CACHE_INIT: OnceLock<()> = OnceLock::new();
+    static SMALL_DICTS: OnceLock<()> = OnceLock::new();
+
+    struct TestGuard {
+        _lock: std::sync::MutexGuard<'static, ()>,
+        prev_alias_mode: bool,
     }
 
-    impl LookupCacheGuard {
-        fn new(keys: &[&str]) -> Self {
-            let mut originals = Vec::new();
-            if let Ok(guard) = LOOKUPS.read() {
-                for key in keys {
-                    originals.push(((*key).to_string(), guard.get(*key).cloned()));
-                }
-            } else {
-                for key in keys {
-                    originals.push(((*key).to_string(), None));
-                }
-            }
-            Self { originals }
-        }
-    }
-
-    impl Drop for LookupCacheGuard {
+    impl Drop for TestGuard {
         fn drop(&mut self) {
-            if let Ok(mut guard) = LOOKUPS.write() {
-                for (key, original) in &self.originals {
-                    match original {
-                        Some(existing) => {
-                            guard.insert(key.clone(), existing.clone());
-                        }
-                        None => {
-                            guard.remove(key);
-                        }
-                    }
-                }
-            }
-            for (key, _) in &self.originals {
-                clear_override_cache_for(key);
-            }
+            set_prefer_test_dictionary_aliases(self.prev_alias_mode);
         }
     }
 
-    fn small_override_dictionary() -> FixDictionary {
-        let xml = r#"
-<fix type='FIX' major='4' minor='4'>
-  <header>
-    <field name='BeginString' required='Y'/>
-  </header>
-  <trailer>
-    <field name='CheckSum' required='Y'/>
-  </trailer>
-  <messages>
-    <message name='Heartbeat' msgtype='0' msgcat='admin'>
-      <field name='MsgType' required='Y'/>
-    </message>
-  </messages>
-  <components/>
-  <fields>
-    <field number='8' name='BeginString' type='STRING'/>
-    <field number='10' name='CheckSum' type='STRING'/>
-    <field number='35' name='MsgType' type='STRING'>
-      <value enum='0' description='Heartbeat'/>
-    </field>
-  </fields>
-</fix>
-"#;
-        FixDictionary::from_xml(xml).expect("override test dictionary parses")
+    fn test_lock() -> TestGuard {
+        let lock = LOOKUP_TEST_GUARD.lock().unwrap_or_else(|p| p.into_inner());
+        let prev_alias_mode = set_prefer_test_dictionary_aliases(true);
+        TestGuard {
+            _lock: lock,
+            prev_alias_mode,
+        }
     }
 
-    fn small_detected_dictionary() -> FixDictionary {
-        let xml = r#"
-<fix type='FIX' major='5' minor='0' servicepack='2'>
-  <header>
-    <field name='BeginString' required='Y'/>
-  </header>
-  <trailer>
-    <field name='CheckSum' required='Y'/>
-  </trailer>
+    fn init_small_dicts() {
+        SMALL_DICTS.get_or_init(|| {
+            register_dictionary("FIX44_TEST", &small_dict("4", "4", None));
+            register_dictionary("FIX50_TEST", &small_dict("5", "0", None));
+            register_dictionary("FIX50SP2_TEST", &small_dict("5", "0", Some("2")));
+        });
+    }
+
+    fn small_dict(major: &str, minor: &str, servicepack: Option<&str>) -> FixDictionary {
+        let sp_attr = servicepack
+            .map(|sp| format!(" servicepack='{sp}'"))
+            .unwrap_or_default();
+        let xml = format!(
+            r#"
+<fix type='FIX' major='{major}' minor='{minor}'{sp_attr}>
+  <header><field name='BeginString' required='Y'/></header>
+  <trailer><field name='CheckSum' required='Y'/></trailer>
   <messages>
     <message name='Heartbeat' msgtype='0' msgcat='admin'>
       <field name='MsgType' required='Y'/>
@@ -810,23 +858,45 @@ mod tests {
     </field>
   </fields>
 </fix>
-"#;
-        FixDictionary::from_xml(xml).expect("detected test dictionary parses")
+"#
+        );
+        FixDictionary::from_xml(&xml).expect("small dict parses")
+    }
+
+    fn ensure_cached(keys: &[&str]) {
+        // One-time init hook if needed later.
+        TEST_CACHE_INIT.get_or_init(|| ());
+        let mut missing: Vec<String> = Vec::new();
+        if let Ok(guard) = LOOKUPS.read() {
+            for key in keys {
+                if !guard.contains_key(*key) {
+                    missing.push((*key).to_string());
+                }
+            }
+        }
+        for key in missing {
+            if let Some(dict) = get_dictionary(&key)
+                && let Ok(mut guard) = LOOKUPS.write()
+            {
+                guard.insert(key.clone(), dict);
+            }
+        }
     }
 
     #[test]
     fn detects_schema_from_default_appl_ver_id() {
-        let _lock = LOOKUP_TEST_GUARD.lock().unwrap();
+        let _lock = test_lock();
         let msg = "8=FIXT.1.1\u{0001}35=D\u{0001}1137=8\u{0001}10=000\u{0001}";
         assert_eq!(detect_schema_key(msg), "FIX50SP1");
     }
 
     #[test]
     fn load_dictionary_respects_override_key() {
-        let _lock = LOOKUP_TEST_GUARD.lock().unwrap();
+        let _lock = test_lock();
+        init_small_dicts();
         reset_override_warn();
-        let msg = "8=FIX.4.2\u{0001}35=D\u{0001}1128=9\u{0001}10=000\u{0001}";
-        let overridden = load_dictionary_with_override(msg, Some("FIX50"));
+        let msg = "8=FIXT.1.1\u{0001}35=0\u{0001}1128=9\u{0001}10=000\u{0001}";
+        let overridden = load_dictionary_with_override(msg, Some("FIX50SP2_TEST"));
         assert_eq!(
             overridden.field_name(1128),
             "ApplVerID",
@@ -840,7 +910,8 @@ mod tests {
 
     #[test]
     fn warns_and_falls_back_on_unknown_override() {
-        let _lock = LOOKUP_TEST_GUARD.lock().unwrap();
+        let _lock = test_lock();
+        init_small_dicts();
         reset_override_warn();
         let msg = "8=FIX.4.4\u{0001}35=0\u{0001}10=000\u{0001}";
         let dict = load_dictionary_with_override(msg, Some("FIX00BAD"));
@@ -850,29 +921,23 @@ mod tests {
 
     #[test]
     fn override_uses_fallback_dictionary_for_missing_tags() {
-        let _lock = LOOKUP_TEST_GUARD.lock().unwrap();
-        let _cache_guard = LookupCacheGuard::new(&["FIX44", "FIX50SP2"]);
+        let _lock = test_lock();
+        init_small_dicts();
+        ensure_cached(&["FIX44_TEST", "FIX50SP2_TEST"]);
         reset_override_warn();
-        register_dictionary("FIX44", &small_override_dictionary());
-        register_dictionary("FIX50SP2", &small_detected_dictionary());
-        clear_override_cache_for("FIX44");
-        clear_override_cache_for("FIX50SP2");
         let msg = "8=FIXT.1.1\u{0001}35=0\u{0001}1128=9\u{0001}10=000\u{0001}";
-        let dict = load_dictionary_with_override(msg, Some("FIX44"));
+        let dict = load_dictionary_with_override(msg, Some("FIX44_TEST"));
         assert_eq!(
             dict.field_name(1128),
             "ApplVerID",
             "override should fall back to detected FIX version when a tag is absent"
         );
-        assert!(
-            !override_warn_triggered(),
-            "successful fallback should not trigger override warning flag"
-        );
+        assert!(override_warn_triggered(), "mismatched override should warn");
     }
 
     #[test]
     fn repeatable_tags_include_nested_groups() {
-        let _lock = LOOKUP_TEST_GUARD.lock().unwrap();
+        let _lock = test_lock();
         let xml = r#"
 <fix type='FIX' major='4' minor='4'>
   <header><field name='BeginString' required='Y'/></header>

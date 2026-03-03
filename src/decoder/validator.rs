@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// SPDX-FileCopyrightText: 2025 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
 
 use crate::decoder::fixparser::{FieldValue, parse_fix};
 use crate::decoder::tag_lookup::{FixTagLookup, GroupSpec as MessageDefGroupSpec, MessageDef};

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// SPDX-FileCopyrightText: 2025 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
 
 use crate::decoder::colours::palette;
 use crate::decoder::display::{pad_ansi, visible_width};
@@ -99,6 +99,17 @@ impl OrderSummary {
         if fields.is_empty() {
             return;
         }
+        let msg_type = fields
+            .iter()
+            .find(|f| f.tag == 35)
+            .map(|f| f.value.as_str());
+        if let Some(mt) = msg_type {
+            if !is_order_flow_msg(mt) {
+                return;
+            }
+        } else {
+            return;
+        }
         if let Some(key) = fix_override {
             self.fix_override_key.get_or_insert_with(|| key.to_string());
         }
@@ -140,7 +151,7 @@ impl OrderSummary {
             map.get(&11).cloned(),
             map.get(&41).cloned(),
         );
-        record.absorb_fields(&map, &dict, map.get(&35).map(|s| s.as_str()));
+        record.absorb_fields(&map, &dict, msg_type);
 
         let event = OrderEvent::from_fields(&map, &dict);
         record.events.push(event);
@@ -157,15 +168,14 @@ impl OrderSummary {
 
     /// Render and clear any completed orders to allow streaming output in summary-only mode.
     pub fn render(&self, out: &mut dyn Write) -> std::io::Result<()> {
+        if self.total_orders == 0 && self.orders.is_empty() && self.completed.is_empty() {
+            return Ok(());
+        }
         let colours = palette();
         let mut keys: Vec<&String> = self.orders.keys().collect();
         keys.sort();
         let open = self.orders.len();
         let total = self.total_orders;
-
-        if self.footer_width > 0 {
-            writeln!(out, "\r{}", " ".repeat(self.footer_width))?;
-        }
 
         for record in &self.completed {
             self.render_record(out, record)?;
@@ -204,21 +214,6 @@ impl OrderSummary {
         self.completed.clear();
         out.flush()?;
         Ok(true)
-    }
-
-    pub fn render_footer(&mut self, out: &mut dyn Write) -> std::io::Result<()> {
-        let line = format!(
-            "Status: open={} filled={} total={}",
-            self.orders.len(),
-            self.terminal_orders,
-            self.total_orders
-        );
-        let width = visible_width(&line).max(self.footer_width);
-        let pad = " ".repeat(width.saturating_sub(visible_width(&line)));
-        write!(out, "\r{}{pad}", line)?;
-        out.flush()?;
-        self.footer_width = width;
-        Ok(())
     }
 
     fn render_messages(&self, out: &mut dyn Write, record: &OrderRecord) -> std::io::Result<()> {
@@ -284,6 +279,18 @@ impl OrderSummary {
             self.aliases.entry(id).or_insert_with(|| key.to_string());
         }
     }
+}
+
+fn is_order_flow_msg(msg_type: &str) -> bool {
+    matches!(
+        msg_type,
+        "D"   // NewOrderSingle
+        | "F" // OrderCancelRequest
+        | "G" // OrderCancelReplaceRequest
+        | "8" // ExecutionReport
+        | "9" // OrderCancelReject
+        | "BN" // Block Notice (treated as order flow here)
+    )
 }
 
 fn render_record_header(

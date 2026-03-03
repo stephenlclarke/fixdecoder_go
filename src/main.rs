@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// SPDX-FileCopyrightText: 2025 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
 
 /// fixdecoder command-line entry point and CLI orchestration.
 ///
@@ -10,6 +10,7 @@
 /// reminder of why each function exists and how it cooperates with the rest
 /// of the app.
 mod decoder;
+mod error_logger;
 mod fix;
 
 use crate::decoder::colours;
@@ -105,13 +106,18 @@ fn install_interrupt_handler() -> Result<()> {
 /// Conventional `main` that defers to `run` so tests can call the logic
 /// without having to spin up a separate process.
 fn main() {
-    process::exit(match run() {
+    let code = match run() {
         Ok(code) => code,
         Err(err) => {
             eprintln!("{err}");
+            error_logger::log_error(&err.to_string());
             1
         }
-    });
+    };
+    if let Some((path, count)) = error_logger::summary() {
+        eprintln!("{} error(s) logged to {}", count, path);
+    }
+    process::exit(code);
 }
 
 /// Parse CLI arguments, load dictionaries, respond to informational flags
@@ -131,16 +137,28 @@ fn run() -> Result<i32> {
         return Ok(0);
     }
 
-    apply_colour_preferences(&opts);
-
     let obfuscator = fix::create_obfuscator(opts.secret);
     let files = resolve_input_files(&opts);
-
-    let mut summary = opts.summary.then(|| OrderSummary::new(opts.delimiter));
     let fix_override = opts
         .fix_from_user
         .then(|| normalise_fix_key(&opts.fix_version))
         .flatten();
+
+    if opts.ui {
+        return decoder::ui::run_ui(
+            &files,
+            opts.secret,
+            opts.delimiter,
+            opts.validate,
+            opts.summary,
+            opts.follow,
+            fix_override.as_deref(),
+        );
+    }
+
+    apply_colour_preferences(&opts);
+
+    let mut summary = opts.summary.then(|| OrderSummary::new(opts.delimiter));
     let mut stdout = io::stdout();
     let mut stderr = io::stderr();
     let mut ctx = build_context(
@@ -227,6 +245,7 @@ fn build_context<'a>(
         validation_enabled: opts.validate,
         message_counts: std::collections::HashMap::new(),
         counts_dirty: false,
+        counts_height: 0,
         interrupted: decoder::prettifier::interrupt_flag(),
     }
 }
@@ -236,7 +255,7 @@ fn warn_on_override_fallback(err_out: &mut dyn Write) {
         let colours = colours::palette();
         let _ = writeln!(
             err_out,
-            "{}Notice:{} FIX override not found; decoded using detected dictionary",
+            "\n{}Notice:{} FIX override was unavailable or mismatched the detected schema; decoded using detected fallback data where needed",
             colours.error, colours.reset
         );
     }
@@ -342,6 +361,12 @@ fn build_cli() -> Command {
             .action(ArgAction::SetTrue)
             .help("Stream input like tail -f"),
     )
+    .arg(
+        Arg::new("ui")
+            .long("ui")
+            .action(ArgAction::SetTrue)
+            .help("Launch an interactive terminal viewer (bat-style layout)"),
+    )
 }
 
 /// Add a `--name[=VALUE]` argument that can be used with or without a value (defaulting to “true”).
@@ -400,6 +425,7 @@ struct CliOptions {
     summary: bool,
     #[allow(dead_code)]
     follow: bool,
+    ui: bool,
     files: Vec<String>,
     delimiter: char,
 }
@@ -445,6 +471,7 @@ impl CliOptions {
             show_version: matches.get_flag("version"),
             summary: matches.get_flag("summary"),
             follow: matches.get_flag("follow"),
+            ui: matches.get_flag("ui"),
             files,
             delimiter: parse_delimiter(matches.get_one::<String>("delimiter"))?,
         })
@@ -975,6 +1002,7 @@ mod tests {
             show_version: false,
             summary: false,
             follow: false,
+            ui: false,
             files: Vec::new(),
             delimiter: '\u{0001}',
         }
@@ -1106,6 +1134,14 @@ mod tests {
             .expect("parse follow/summary");
         assert!(matches.get_flag("summary"));
         assert!(matches.get_flag("follow"));
+    }
+
+    #[test]
+    fn build_cli_parses_ui_flag() {
+        let matches = build_cli()
+            .try_get_matches_from(["fixdecoder", "--ui"])
+            .expect("parse ui flag");
+        assert!(matches.get_flag("ui"));
     }
 
     #[test]

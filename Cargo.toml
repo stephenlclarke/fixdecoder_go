@@ -1,7 +1,25 @@
 [package]
 name = "fixdecoder"
-version = "0.3.0"
+version = "1.0.0"
 edition = "2024"
+license = "AGPL-3.0-only"
+description = "CLI decoder and summarizer for FIX protocol messages"
+repository = "https://github.com/stephenlclarke/fixdecoder2"
+readme = "README.md"
+keywords = ["fix", "finance", "trading", "protocol", "decoder"]
+categories = ["command-line-utilities", "network-programming", "parser-implementations"]
+rust-version = "1.91"
+include = [
+    "src/**",
+    "tests/**",
+    "resources/**",
+    "build.rs",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md",
+]
 
 [dependencies]
 anyhow = "1.0"
@@ -15,6 +33,10 @@ terminal_size = "0.4.3"
 roxmltree = "0.21.1"
 rayon = "1.10"
 ctrlc = "3.4"
+bubbletea-rs = "0.0.9"
+bubbletea-widgets = { version = "0.1.12", default-features = false }
+crossterm = "0.29"
+tokio = { version = "1.48", features = ["full"] }
 
 [dev-dependencies]
 assert_cmd = "2.0"

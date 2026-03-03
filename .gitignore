@@ -15,6 +15,7 @@ fixlog.txt
 
 # Generated artefacts / outputs
 target/
+packaging/rendered/
 build_version.env
 src/fix/sensitive.rs
 resources/**/*.xml

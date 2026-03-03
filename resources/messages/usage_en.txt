@@ -52,3 +52,19 @@ Command line option examples:
     Process a FIX log file and display an order summary for each order that is processed.
 
     $ fixdecoder --summary --follow logs/fix.log
+
+  Interactive terminal UI (bat-style):
+
+    fixdecoder [--xml=FILE --xml=FILE2 ...] [--validate] [--secret] [--summary] [--fix=VER] [--delimiter=CHAR] --ui [file.log]
+
+    Open a decoded view with line numbers and keyboard navigation in an alternate screen.
+    Press 'r' to toggle raw/decoded view, 'w' to toggle line wrap, and 's' to toggle secret obfuscation on/off.
+    Press 'f' to open the filter dialog, add tag/value or tag-present clauses, and toggle the FIX Spec conformance checkbox.
+    In MsgType selection: use Space to select multiple types, Enter to apply MsgType-only filtering, or 't' to continue to tag filtering.
+    When FIX Spec conformance is on, tag selection is restricted to tags valid for the selected FIX version / MsgType.
+    Use /regex to search forward, ?regex to search backward, n for next match, p for previous-direction match.
+    Use left/right arrows for horizontal scrolling when wrap is off and lines exceed terminal width.
+    Press h to toggle help.
+    ANSI colours are preserved in decoded mode.
+
+    $ fixdecoder --ui logs/fix.log
