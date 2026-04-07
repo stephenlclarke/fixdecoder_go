@@ -1,0 +1,7 @@
+<type>(<scope>): <short summary>
+
+[optional body]
+
+[optional footer(s)]
+
+BREAKING CHANGE: <explanation>

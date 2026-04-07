@@ -1,0 +1,104 @@
+image: golang:1.24.3
+
+definitions:
+  caches:
+    go: go
+
+  steps:
+    - step: &commit_message_lint
+      image: node:20
+      name: Commit Message Lint (Conventional Commits)
+      caches:
+        - node
+      script:
+        - npm ci
+        - npx commitlint --from=origin/${BITBUCKET_PR_DESTINATION_BRANCH:-main}
+
+    - step: &security_scan
+        name: Security Scan
+        script:
+          # Run a security scan for sensitive data
+          - pipe: atlassian/git-secrets-scan:3.1.0
+            variables:
+              DEBUG: "true"
+              CREATE_REPORT: "true"
+              GITLEAKS_COMMAND: "dir"
+              GITLEAKS_EXTRA_ARGS:
+                - "-v"
+                - "--config=gitleaks-config.toml"
+
+    - step: &build
+        name: Build
+        caches:
+          - go
+        script:
+          - make build
+        after-script:
+          - ls -lart bin/
+        artifacts:
+          - bin/**
+
+    - step: &unit-tests
+        name: Unit Tests
+        caches:
+          - go
+        script:
+          - make unit-test
+        after-script:
+          - ls -lart reports
+        artifacts:
+          - reports/*.out
+          - reports/*.xml
+
+    - step: &integration-tests
+        name: Integration Tests
+        caches:
+          - go
+        script:
+          - make integration-test
+        after-script:
+          - ls -lart reports
+        artifacts:
+          - reports/*.out
+
+    - step: &sonar_analysis
+        name: SonarCloud Analysis
+        artifacts:
+          - reports/**
+        caches:
+          - go
+        before-script:
+          - ls -lart reports
+        script:
+          - pipe: sonarsource/sonarcloud-scan:3.1.0
+            variables:
+              SONAR_TOKEN: $SONAR_TOKEN
+          - pipe: sonarsource/sonarcloud-quality-gate:0.2.0
+            variables:
+              SONAR_TOKEN: $SONAR_TOKEN
+
+pipelines:
+  default:
+    - step: *security_scan
+    - step: *build
+    - step: *unit-tests
+    - step: *integration-tests
+    - step: *sonar_analysis
+
+  branches:
+    "{main,master,develop}":
+      - step: *security_scan
+      - step: *build
+      - step: *unit-tests
+      - step: *integration-tests
+      - step: *sonar_analysis
+
+  pull-requests:
+    '**':
+      - step:
+          name: Commit Message Lint (Conventional Commits)
+          caches:
+            - node
+          script:
+            - npm ci
+            - npx commitlint --from=origin/${BITBUCKET_PR_DESTINATION_BRANCH:-main}

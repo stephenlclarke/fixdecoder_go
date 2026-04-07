@@ -5,7 +5,7 @@
 All commit messages **must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)** format:
 
 ```text
-<type>(JIRA-KEY:scope): <short summary>
+<type>(<scope>): <short summary>
 
 [optional body]
 
@@ -26,9 +26,9 @@ All commit messages **must follow the [Conventional Commits](https://www.convent
 ### Examples
 
 ```text
-feat(DO-1431:decoder): add support for obfuscated fix tags
-fix(DO-1431:autogen): fix malformed xml
-BREAKING CHANGE(DO-1431): changed cmdline flag prefix to --
+feat(orderbook): add support for L3 aggregation
+fix(trade): handle null pointer in price validation
+BREAKING CHANGE: renamed `/api/prices` endpoint
 ```
 
 ## 🛠️ Local Git Config (Optional)
