@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+//
+/// fixdecoder command-line entry point and CLI orchestration.
+///
+/// The binary ties together the dictionary tooling and the streaming FIX log
+/// prettifier.  This file is intentionally light on protocol logic; it wires
+/// user input into the focused modules under `src/decoder` and `src/fix`.
+/// The comments favour UK English and aim to give future maintainers a quick
+/// reminder of why each function exists and how it cooperates with the rest
+/// of the app.
+
 package decoder
 
 import (
@@ -24,6 +36,8 @@ const (
 	ColourEnum  = "\033[38;5;214m"
 	ColourFile  = "\033[95m"
 	ColourError = "\033[31m"
+
+	maxLogLineBytes = 10 * 1024 * 1024
 )
 
 func Prettify(msg string) string {
@@ -111,6 +125,7 @@ func PrettifyFiles(paths []string, out io.Writer, errOut io.Writer) int {
 func streamLog(in io.Reader, out io.Writer) error {
 	re := regexp.MustCompile(`8=FIX.*?10=\d{3}`)
 	scanner := bufio.NewScanner(in)
+	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxLogLineBytes)
 
 	for scanner.Scan() {
 		line := scanner.Text()

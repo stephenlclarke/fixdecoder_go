@@ -10,20 +10,14 @@
 /// reminder of why each function exists and how it cooperates with the rest
 /// of the app.
 
-// displaySchema.go
-package decoder
+package fix
 
-import "fmt"
-
-// PrintSchemaSummary writes a one-line overview of the dictionary that was
-// just loaded.
-func PrintSchemaSummary(schema SchemaTree) {
-	fields := len(schema.Fields)
-	components := len(schema.Components)
-	messages := len(schema.Messages)
-	version := schema.Version
-	servicePack := schema.ServicePack
-
-	fmt.Printf("Fields: %d   Components: %d   Messages: %d   Version: %s  Service Pack: %s\n",
-		fields, components, messages, version, servicePack)
+// IsSupportedFixVersion reports whether the version has an embedded schema.
+func IsSupportedFixVersion(ver string) bool {
+	switch ver {
+	case "40", "41", "42", "43", "44", "50", "50SP1", "50SP2", "T11":
+		return true
+	default:
+		return false
+	}
 }

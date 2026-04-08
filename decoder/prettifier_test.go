@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+//
+/// fixdecoder command-line entry point and CLI orchestration.
+///
+/// The binary ties together the dictionary tooling and the streaming FIX log
+/// prettifier.  This file is intentionally light on protocol logic; it wires
+/// user input into the focused modules under `src/decoder` and `src/fix`.
+/// The comments favour UK English and aim to give future maintainers a quick
+/// reminder of why each function exists and how it cooperates with the rest
+/// of the app.
+
 package decoder
 
 import (
@@ -63,6 +75,40 @@ func TestStreamLogNoMatch(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Just a regular log line") {
 		t.Error("Expected original line echoed")
+	}
+}
+
+func TestStreamLogHandlesLongLines(t *testing.T) {
+	originalLoadDictionary := loadDictionary
+	originalParseFix := parseFix
+	defer func() {
+		loadDictionary = originalLoadDictionary
+		parseFix = originalParseFix
+	}()
+
+	loadDictionary = func(string) *FixTagLookup {
+		return &FixTagLookup{
+			tagToName: map[int]string{35: "MsgType"},
+			enumMap: map[int]map[string]string{
+				35: {"A": "Logon"},
+			},
+		}
+	}
+
+	parseFix = func(string) []FieldValue {
+		return []FieldValue{{Tag: 35, Value: "A"}}
+	}
+
+	longTail := strings.Repeat("X", 70_000)
+	in := strings.NewReader("INFO 8=FIX.4.4\x0135=A\x0110=123\x01 " + longTail)
+	var out bytes.Buffer
+
+	if err := streamLog(in, &out); err != nil {
+		t.Fatalf("streamLog() returned error for long line: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "MsgType") {
+		t.Fatalf("expected prettified FIX content in output")
 	}
 }
 

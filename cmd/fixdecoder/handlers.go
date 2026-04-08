@@ -1,7 +1,20 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+//
+/// fixdecoder command-line entry point and CLI orchestration.
+///
+/// The binary ties together the dictionary tooling and the streaming FIX log
+/// prettifier.  This file is intentionally light on protocol logic; it wires
+/// user input into the focused modules under `src/decoder` and `src/fix`.
+/// The comments favour UK English and aim to give future maintainers a quick
+/// reminder of why each function exists and how it cooperates with the rest
+/// of the app.
+
 package main
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 
@@ -65,7 +78,7 @@ func handleMessage(opts CLIOptions, schema decoder.SchemaTree) bool {
 		}
 
 	case "": // explicit -message=
-		PrintUsage()
+		PrintUsage(os.Stdout)
 	default:
 		// specific message
 		for _, m := range schema.Messages {
@@ -91,7 +104,7 @@ func handleTag(opts CLIOptions, schema decoder.SchemaTree) bool {
 	case "true": // bare -tag
 		handleBareTag(opts, schema)
 	case "": // explicit -tag=
-		PrintUsage()
+		PrintUsage(os.Stdout)
 	default:
 		handleSpecificTag(opts, schema)
 	}
@@ -132,7 +145,7 @@ func handleComponent(opts CLIOptions, schema decoder.SchemaTree) bool {
 	case "true": // bare -component
 		handleBareComponent(opts, schema)
 	case "": // explicit -component=
-		PrintUsage()
+		PrintUsage(os.Stdout)
 	default:
 		handleSpecificComponent(opts, schema)
 	}
@@ -165,9 +178,7 @@ func handleSpecificComponent(opts CLIOptions, schema decoder.SchemaTree) {
 // runHandlers invokes each of the "-info", "-message", "-tag", and "-component" handlers.
 // It returns true if any handler succeeded.
 func runHandlers(opts CLIOptions, schema decoder.SchemaTree) bool {
-	handleXML(opts, schema)
-
-	handled := false
+	handled := handleXML(opts, schema)
 
 	if handleInfo(opts, schema) {
 		handled = true

@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+//
+/// fixdecoder command-line entry point and CLI orchestration.
+///
+/// The binary ties together the dictionary tooling and the streaming FIX log
+/// prettifier.  This file is intentionally light on protocol logic; it wires
+/// user input into the focused modules under `src/decoder` and `src/fix`.
+/// The comments favour UK English and aim to give future maintainers a quick
+/// reminder of why each function exists and how it cooperates with the rest
+/// of the app.
+
 package fix
 
 import (
@@ -52,5 +64,15 @@ func TestSupportedFixVersions(t *testing.T) {
 
 	if got != expected {
 		t.Errorf("SupportedFixVersions() = %q, want %q", got, expected)
+	}
+}
+
+func TestIsSupportedFixVersion(t *testing.T) {
+	if !IsSupportedFixVersion("44") {
+		t.Fatal("expected FIX 4.4 to be supported")
+	}
+
+	if IsSupportedFixVersion("99") {
+		t.Fatal("expected FIX 99 to be unsupported")
 	}
 }

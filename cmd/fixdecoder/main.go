@@ -1,8 +1,21 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
+//
+/// fixdecoder command-line entry point and CLI orchestration.
+///
+/// The binary ties together the dictionary tooling and the streaming FIX log
+/// prettifier.  This file is intentionally light on protocol logic; it wires
+/// user input into the focused modules under `src/decoder` and `src/fix`.
+/// The comments favour UK English and aim to give future maintainers a quick
+/// reminder of why each function exists and how it cooperates with the rest
+/// of the app.
+
 // main.go
 package main
 
 import (
 	"encoding/xml"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -55,6 +68,7 @@ func (m *messageFlag) IsBoolFlag() bool   { return true }
 type CLIOptions struct {
 	XMLPath        string
 	FixVersion     string
+	FileArgs       []string
 	Component      componentFlag
 	Verbose        bool
 	IncludeHeader  bool
@@ -67,12 +81,13 @@ type CLIOptions struct {
 
 // validateXMLFlag ensures the user supplied -xml=FILE syntax is correct.
 // parseFlagsArgs parses command-line arguments using a fresh FlagSet.
-func parseFlagsArgs(args []string) CLIOptions {
+func parseFlagsArgs(args []string, errOut io.Writer) (CLIOptions, error) {
 	var message messageFlag
 	var component componentFlag
 	var tag tagFlag
 
 	fs := flag.NewFlagSet("fixdecoder", flag.ContinueOnError)
+	fs.SetOutput(errOut)
 	xmlPath := fs.String("xml", "", "Path to alternative FIX XML file")
 	fixVersion := fs.String("fix", "44", "FIX version to use ("+fix.SupportedFixVersions()+")")
 	verbose := fs.Bool("verbose", false, "Show full message structure with enums")
@@ -85,17 +100,19 @@ func parseFlagsArgs(args []string) CLIOptions {
 	info := fs.Bool("info", false, "Show XML schema summary (fields, components, messages, version counts)")
 
 	fs.Usage = func() {
-		PrintUsage()
-		fmt.Println("\nFlags:")
+		PrintUsage(errOut)
+		fmt.Fprintln(errOut, "\nFlags:")
 		fs.PrintDefaults()
-		os.Exit(0)
 	}
 
-	fs.Parse(args)
+	if err := fs.Parse(normalizeOptionalFlagArgs(args)); err != nil {
+		return CLIOptions{}, err
+	}
 
 	return CLIOptions{
 		XMLPath:        *xmlPath,
 		FixVersion:     *fixVersion,
+		FileArgs:       fileArgsOrStdin(fs.Args()),
 		Component:      component,
 		Verbose:        *verbose,
 		IncludeHeader:  *includeHeader,
@@ -104,18 +121,18 @@ func parseFlagsArgs(args []string) CLIOptions {
 		Message:        message,
 		Tag:            tag,
 		Info:           *info,
-	}
+	}, nil
 }
 
 // printUsage prints the program usage.
-func PrintUsage() {
-	fmt.Printf("fixdecoder %s (branch:%s, commit:%s)\n\n", Version, Branch, Sha)
-	fmt.Printf("  git clone %s\n\n", GitUrl)
-	fmt.Println("Usage: fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-message[=MSG] [-verbose] [-column] [-header] [-trailer]]")
-	fmt.Println("       fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-tag[=TAG] [-verbose] [-column]]")
-	fmt.Println("       fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-component=[NAME] [-verbose]]")
-	fmt.Println("       fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-info]")
-	fmt.Println("       fixdecoder [file1.log file2.log ...]")
+func PrintUsage(out io.Writer) {
+	fmt.Fprintf(out, "fixdecoder %s (branch:%s, commit:%s)\n\n", Version, Branch, Sha)
+	fmt.Fprintf(out, "  git clone %s\n\n", GitUrl)
+	fmt.Fprintln(out, "Usage: fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-message[=MSG] [-verbose] [-column] [-header] [-trailer]]")
+	fmt.Fprintln(out, "       fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-tag[=TAG] [-verbose] [-column]]")
+	fmt.Fprintln(out, "       fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-component=[NAME] [-verbose]]")
+	fmt.Fprintln(out, "       fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-info]")
+	fmt.Fprintln(out, "       fixdecoder [file1.log file2.log ...]")
 }
 
 // loadSchema reads and parses the FIX XML into a SchemaTree.
@@ -133,26 +150,52 @@ func loadSchema(path string) (decoder.SchemaTree, error) {
 	return decoder.BuildSchema(dict), nil
 }
 
-// extractFileArgsOrStdin returns all CLI elements that represent filenames
-// (i.e. arguments that do NOT begin with '-').
-// If the user supplied no such arguments, it returns []{"-"}, which
-// decoder.PrettifyFiles interprets as "read from os.Stdin".
-func extractFileArgsOrStdin(args []string) []string {
-	var files []string
-	for _, a := range args {
-		if !strings.HasPrefix(a, "-") || a == "-" {
-			files = append(files, a)
+func normalizeOptionalFlagArgs(args []string) []string {
+	normalized := make([]string, 0, len(args))
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			normalized = append(normalized, args[i:]...)
+			break
 		}
+
+		if (arg == "-message" || arg == "-tag" || arg == "-component") &&
+			i+1 < len(args) &&
+			!strings.HasPrefix(args[i+1], "-") {
+			normalized = append(normalized, arg+"="+args[i+1])
+			i++
+			continue
+		}
+
+		normalized = append(normalized, arg)
 	}
-	if len(files) == 0 {
-		files = []string{"-"}
+
+	return normalized
+}
+
+func fileArgsOrStdin(args []string) []string {
+	if len(args) == 0 {
+		return []string{"-"}
 	}
-	return files
+
+	return args
 }
 
 // Process is the entry point: parses flags, loads a schema, runs handlers, and returns an exit code.
 func Process(args []string, out, errOut io.Writer) int {
-	opts := parseFlagsArgs(args)
+	opts, err := parseFlagsArgs(args, errOut)
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+
+		return 2
+	}
+
+	if opts.XMLPath == "" && !fix.IsSupportedFixVersion(opts.FixVersion) {
+		fmt.Fprintf(errOut, "Unsupported FIX version %q; continuing with FIX 4.4 fallback\n", opts.FixVersion)
+	}
 
 	schema, err := loadSchemaFromOpts(opts)
 	if err != nil {
@@ -164,8 +207,7 @@ func Process(args []string, out, errOut io.Writer) int {
 		return 0
 	}
 
-	files := extractFileArgsOrStdin(args)
-	return decoder.PrettifyFiles(files, out, errOut)
+	return decoder.PrettifyFiles(opts.FileArgs, out, errOut)
 }
 
 // loadSchemaFromOpts picks between an explicit XML file or an embedded schema.
