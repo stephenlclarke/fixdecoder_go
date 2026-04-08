@@ -33,10 +33,26 @@ func buildBinary(t *testing.T) string {
 	}
 
 	path := filepath.Join(t.TempDir(), name)
-	cmd := exec.Command("go", "build", "-o", path, ".")
+	cmd := exec.Command(goToolPath(t), "build", "-o", path, ".")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("go build failed: %v\n%s", err, output)
+	}
+
+	return path
+}
+
+func goToolPath(t *testing.T) string {
+	t.Helper()
+
+	name := "go"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+
+	path := filepath.Join(runtime.GOROOT(), "bin", name)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("go tool not found at %q: %v", path, err)
 	}
 
 	return path
