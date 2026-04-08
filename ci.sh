@@ -236,9 +236,10 @@ function code_scan() {
     log_message ">> Using local sonar-scanner"
     sonar-scanner -Dsonar.token="${SONAR_TOKEN}" "$@"
   else
-    log_message ">> Local sonar-scanner not found, falling back to Docker image"
+    log_message ">> Local sonar-scanner not found, falling back to Docker image with bundled Java"
     docker run --rm \
       -e SONAR_TOKEN="${SONAR_TOKEN}" \
+      -e SONAR_SCANNER_SKIP_JRE_PROVISIONING=true \
       -v "$(pwd):/usr/src" \
       sonarsource/sonar-scanner-cli \
       -Dsonar.token="${SONAR_TOKEN}" \
