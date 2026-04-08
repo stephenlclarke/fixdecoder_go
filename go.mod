@@ -1,4 +1,4 @@
-module bitbucket.org/edgewater/fixdecoder
+module github.com/stephenlclarke/fixdecoder_go
 
 go 1.24.3
 

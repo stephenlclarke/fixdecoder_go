@@ -19,7 +19,7 @@ import (
 	"strings"
 	"sync"
 
-	"bitbucket.org/edgewater/fixdecoder/fix"
+	"github.com/stephenlclarke/fixdecoder_go/fix"
 	"golang.org/x/net/html/charset"
 )
 

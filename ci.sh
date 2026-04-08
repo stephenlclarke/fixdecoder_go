@@ -18,10 +18,10 @@
 #   scripts/ci.sh build             – compile binary (was build.sh → build)
 #   scripts/ci.sh unit-test         – unit tests + coverage  (was build.sh → unit)
 #   scripts/ci.sh integration-test  – integration tests      (was build.sh → integration)
-#   scripts/ci.sh scan              – gitleaks secret scan   (was scan.sh)
+#   scripts/ci.sh scan              – SonarQube scan         (was scan.sh)
 #
 # Every build-related target runs the common preparation steps that lived
-# in build.sh:  setup_environment → install_dependencies → tidy → generate_fix
+# in build.sh:  setup_environment → install_dependencies → tidy
 # ---------------------------------------------------------------------------
 
 set -eo pipefail
@@ -57,7 +57,26 @@ function setup_environment() {
   log_message ">> Setting up environment"
   export GOPATH=$(go env GOPATH)
   export PATH="$(go env GOPATH)/bin:$PATH"
-  go env -w GOPRIVATE=bitbucket.org/edgewater/fixdecoder
+}
+
+function preferred_remote_name() {
+  if git remote get-url github >/dev/null 2>&1; then
+    echo "github"
+    return
+  fi
+
+  if git remote get-url origin >/dev/null 2>&1; then
+    echo "origin"
+    return
+  fi
+
+  return 1
+}
+
+function preferred_remote_url() {
+  local remote
+  remote=$(preferred_remote_name) || return 1
+  git remote get-url "$remote"
 }
 
 function install_dependencies() {
@@ -120,21 +139,26 @@ function unit_tests() {
 }
 
 function compile_binary() {
+  local remote
+
   # ensure the bin directory exists
   mkdir -p ./bin
 
   # ensure your tags are fetched
-  git fetch --tags
+  remote=$(preferred_remote_name) || true
+  if [[ -n "${remote:-}" ]]; then
+    git fetch "$remote" --tags --force
+  fi
 
   # grab the latest tag and construct a version string (e.g. "v1.2.3")
-  TAG=$(bin/>/dev/null)
+  TAG=$(git describe --tags --abbrev=0 2>/dev/null)
   VERSION=${TAG:="v0.0.0"}
-  git status --porcelain >/dev/null 2>&1 && VERSION="${VERSION}-dirty"
+  [[ -n "$(git status --porcelain)" ]] && VERSION="${VERSION}-dirty"
 
   BRANCH=$(git rev-parse --abbrev-ref HEAD)
   SHORT_SHA=$(git rev-parse --short HEAD)
 
-  URL=$(git remote get-url origin)
+  URL=$(preferred_remote_url 2>/dev/null || true)
 
   log_message ">> Building the application ${VERSION} (branch: ${BRANCH}, commit: ${SHORT_SHA})"
 
@@ -152,7 +176,7 @@ function compile_binary() {
 
 
   # build with that version baked in
-  env GOOS=${OS} GOARCH=${ARCH} go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.Url=${URL}" -o ./bin/fixdecoder${BUILD_TAG} ./cmd/fixdecoder
+  env GOOS=${OS} GOARCH=${ARCH} go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.GitUrl=${URL}" -o ./bin/fixdecoder${BUILD_TAG} ./cmd/fixdecoder
 }
 
 function integration_tests() {
@@ -169,12 +193,6 @@ function integration_tests() {
 }
 
 function code_scan() {
-  if [[ -n "${BITBUCKET_BUILD_NUMBER:-}" ]]; then
-    log_message ">> Skipping SonarQube scan in Bitbucket Pipelines"
-    code_scan=true
-    return
-  fi
-
   if [[ "${code_scan:-false}" == true ]]; then
     return
   fi
@@ -194,14 +212,13 @@ function common_preparation() {
   setup_environment
   install_dependencies
   tidy
-  generate_fix
 
   common_preparation=true
 }
 
 # Argument dispatcher
 if [[ $# -eq 0 ]]; then
-  log_message "usage: $0 {all|build|unit-test|integration-test|scan} [...]"
+  log_message "usage: $0 {all|build|build-all|unit-test|integration-test|scan} [...]"
   exit 1
 fi
 
@@ -239,7 +256,7 @@ for target in "$@"; do
       ;;
     *)
       log_message "Unknown target: $target"
-      log_message "usage: $0 {all|build|unit-test|integration-test|scan} [...]"
+      log_message "usage: $0 {all|build|build-all|unit-test|integration-test|scan} [...]"
       exit 1
       ;;
   esac

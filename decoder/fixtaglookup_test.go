@@ -15,7 +15,7 @@ package decoder
 import (
 	"testing"
 
-	"bitbucket.org/edgewater/fixdecoder/fix"
+	"github.com/stephenlclarke/fixdecoder_go/fix"
 )
 
 const sampleXML = `

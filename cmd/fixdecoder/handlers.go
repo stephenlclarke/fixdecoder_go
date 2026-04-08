@@ -18,8 +18,8 @@ import (
 	"sort"
 	"strconv"
 
-	"bitbucket.org/edgewater/fixdecoder/decoder"
-	"bitbucket.org/edgewater/fixdecoder/fix"
+	"github.com/stephenlclarke/fixdecoder_go/decoder"
+	"github.com/stephenlclarke/fixdecoder_go/fix"
 )
 
 // handleXML is triggered when the user supplied -xml=FILE.

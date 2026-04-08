@@ -22,15 +22,15 @@ import (
 	"os"
 	"strings"
 
-	"bitbucket.org/edgewater/fixdecoder/decoder"
-	"bitbucket.org/edgewater/fixdecoder/fix"
+	"github.com/stephenlclarke/fixdecoder_go/decoder"
+	"github.com/stephenlclarke/fixdecoder_go/fix"
 )
 
 // Version, Branch, GitUrl, Sha are injected at build time via -ldflags
 var (
 	Version = "0.0.0"
 	Branch  = "main"
-	GitUrl  = "git@bitbucket.org:edgewater/fixdecoder.git"
+	GitUrl  = "https://github.com/stephenlclarke/fixdecoder_go.git"
 	Sha     = "0000000"
 )
 

@@ -36,7 +36,26 @@ function setup_environment {
     log_message "Setting up environment"
     export GOPATH=$(go env GOPATH)
     export PATH="$(go env GOPATH)/bin:$PATH"
-    go env -w GOPRIVATE=bitbucket.org/edgewater/fixdecoder
+}
+
+function preferred_remote_name {
+    if git remote get-url github >/dev/null 2>&1; then
+        echo github
+        return
+    fi
+
+    if git remote get-url origin >/dev/null 2>&1; then
+        echo origin
+        return
+    fi
+
+    return 1
+}
+
+function preferred_remote_url {
+    local remote
+    remote=$(preferred_remote_name) || return 1
+    git remote get-url "$remote"
 }
 function install_dependencies {
     log_message "Installing test dependencies"
@@ -99,33 +118,37 @@ function run_integration_tests {
 }
 
 function build_application {
+    local remote
+
     log_message "Building the application"
     # ensure the bin directory exists
     mkdir -p ./bin
 
     # ensure your tags are fetched
-    git fetch --tags
+    remote=$(preferred_remote_name) || true
+    if [[ -n "${remote:-}" ]]; then
+        git fetch "$remote" --tags --force
+    fi
 
     # grab the latest tag and construct a version string (e.g. "v1.2.3")
     TAG=$(git describe --tags --abbrev=0 2>/dev/null)
     VERSION=${TAG:="v0.0.0"}
-    git status --porcelain >/dev/null 2>&1 && VERSION="${VERSION}-dirty"
+    [[ -n "$(git status --porcelain)" ]] && VERSION="${VERSION}-dirty"
 
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
     SHORT_SHA=$(git rev-parse --short HEAD)
 
-    URL=$(git remote get-url origin)
+    URL=$(preferred_remote_url 2>/dev/null || true)
 
     log_message "Building the application ${VERSION} (branch: ${BRANCH}, commit: ${SHORT_SHA})"
 
     # build with that version baked in
-    go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.Url=${URL}" -o ./bin/fixdecoder ./cmd/fixdecoder
+    go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.GitUrl=${URL}" -o ./bin/fixdecoder ./cmd/fixdecoder
 }
 
 setup_environment
 install_dependencies
 tidy
-generate_fix
 run_unit_tests
 run_integration_tests
 build_application
