@@ -63,6 +63,10 @@ function preferred_remote_url {
     remote=$(preferred_remote_name) || return 1
     git remote get-url "$remote"
 }
+
+function latest_tag {
+    git tag --sort=-version:refname | head -n 1
+}
 function install_dependencies {
     log_message "Installing test dependencies"
     go install github.com/jstemmer/go-junit-report/v2@latest
@@ -151,11 +155,11 @@ function build_application {
     # ensure your tags are fetched
     remote=$(preferred_remote_name) || true
     if [[ -n "${remote:-}" ]]; then
-        git fetch "$remote" --tags --force
+        git fetch "$remote" --tags --force || true
     fi
 
-    # grab the latest tag and construct a version string (e.g. "v1.2.3")
-    tag=$(git describe --tags --abbrev=0 2>/dev/null)
+    # Grab the highest version tag available, even in shallow CI clones.
+    tag=$(latest_tag)
     version=${tag:="v0.0.0"}
     [[ -n "$(git status --porcelain)" ]] && version="${version}-dirty"
 
