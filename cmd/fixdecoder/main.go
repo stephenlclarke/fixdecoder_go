@@ -150,6 +150,16 @@ func loadSchema(path string) (decoder.SchemaTree, error) {
 	return decoder.BuildSchema(dict), nil
 }
 
+// loadLookup reads a FIX XML dictionary and turns it into a tag/enum lookup.
+func loadLookup(path string) (*decoder.FixTagLookup, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return decoder.ParseDictionary(string(data))
+}
+
 func normalizeOptionalFlagArgs(args []string) []string {
 	normalized := make([]string, 0, len(args))
 
@@ -197,17 +207,30 @@ func Process(args []string, out, errOut io.Writer) int {
 		fmt.Fprintf(errOut, "Unsupported FIX version %q; continuing with FIX 4.4 fallback\n", opts.FixVersion)
 	}
 
+	var lookupOverride func(string) *decoder.FixTagLookup
+	if opts.XMLPath != "" {
+		lookup, err := loadLookup(opts.XMLPath)
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return 1
+		}
+
+		lookupOverride = func(string) *decoder.FixTagLookup {
+			return lookup
+		}
+	}
+
 	schema, err := loadSchemaFromOpts(opts)
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return 1
 	}
 
-	if runHandlers(opts, schema) {
+	if runHandlers(opts, schema, out) {
 		return 0
 	}
 
-	return decoder.PrettifyFiles(opts.FileArgs, out, errOut)
+	return decoder.PrettifyFilesWithDictionaryLoader(opts.FileArgs, out, errOut, lookupOverride)
 }
 
 // loadSchemaFromOpts picks between an explicit XML file or an embedded schema.

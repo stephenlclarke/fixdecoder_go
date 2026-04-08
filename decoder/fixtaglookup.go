@@ -54,6 +54,11 @@ type FixTagLookup struct {
 	enumMap   map[int]map[string]string
 }
 
+// ParseDictionary builds a lookup table from raw FIX dictionary XML.
+func ParseDictionary(xmlData string) (*FixTagLookup, error) {
+	return parseDictionary(xmlData)
+}
+
 func parseDictionary(xmlData string) (*FixTagLookup, error) {
 	dec := xml.NewDecoder(strings.NewReader(xmlData))
 	dec.CharsetReader = charset.NewReaderLabel

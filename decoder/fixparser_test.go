@@ -18,12 +18,14 @@ import (
 	"testing"
 )
 
+const fixVersion44 = "FIX.4.4"
+
 func TestParseFixValidFields(t *testing.T) {
-	msg := "8=FIX.4.4\x019=112\x0135=A\x01"
+	msg := "8=" + fixVersion44 + "\x019=112\x0135=A\x01"
 	got := ParseFix(msg)
 
 	want := []FieldValue{
-		{Tag: 8, Value: "FIX.4.4"},
+		{Tag: 8, Value: fixVersion44},
 		{Tag: 9, Value: "112"},
 		{Tag: 35, Value: "A"},
 	}
@@ -49,11 +51,11 @@ func TestParseFixEmptyFields(t *testing.T) {
 }
 
 func TestParseFixFieldWithoutEquals(t *testing.T) {
-	msg := "8=FIX.4.4\x01BADFIELD\x0135=A\x01"
+	msg := "8=" + fixVersion44 + "\x01BADFIELD\x0135=A\x01"
 	got := ParseFix(msg)
 
 	want := []FieldValue{
-		{Tag: 8, Value: "FIX.4.4"},
+		{Tag: 8, Value: fixVersion44},
 		{Tag: 35, Value: "A"},
 	}
 
@@ -63,11 +65,11 @@ func TestParseFixFieldWithoutEquals(t *testing.T) {
 }
 
 func TestParseFixInvalidTagNumber(t *testing.T) {
-	msg := "abc=value\x018=FIX.4.4\x01"
+	msg := "abc=value\x018=" + fixVersion44 + "\x01"
 	got := ParseFix(msg)
 
 	want := []FieldValue{
-		{Tag: 8, Value: "FIX.4.4"},
+		{Tag: 8, Value: fixVersion44},
 	}
 
 	if !reflect.DeepEqual(got, want) {

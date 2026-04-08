@@ -21,6 +21,8 @@ import (
 	"testing"
 )
 
+const testTagHeader = "42  : TestTag (STRING)\n"
+
 func TestPrintTagDetailsAllBranches(t *testing.T) {
 	field := Field{
 		Number: 42,
@@ -37,7 +39,7 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 		PrintTagDetails(field, false, false)
 	})
 
-	want := "42  : TestTag (STRING)\n"
+	want := testTagHeader
 	if out != want {
 		t.Errorf("not verbose: got %q, want %q", out, want)
 	}
@@ -51,7 +53,7 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 		t.Errorf("verbose no-column: missing values, got %q", out)
 	}
 
-	if !strings.Contains(out, "42  : TestTag (STRING)\n") {
+	if !strings.Contains(out, testTagHeader) {
 		t.Errorf("verbose no-column: missing header, got %q", out)
 	}
 
@@ -62,7 +64,7 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 	})
 
 	// The output will include both values, and the header.
-	if !strings.Contains(out, "42  : TestTag (STRING)\n") {
+	if !strings.Contains(out, testTagHeader) {
 		t.Errorf("verbose column: missing header, got %q", out)
 	}
 

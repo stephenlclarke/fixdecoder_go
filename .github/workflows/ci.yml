@@ -101,11 +101,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports
-          path: reports/**
+          path: |
+            reports/coverage.out
+            reports/unit-test-report.xml
           if-no-files-found: error
 
   integration-tests:
-    name: Integration Tests
+    name: CLI Integration Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -120,11 +122,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: integration-reports
-          path: reports/**
+          path: reports/coverage.integration.out
           if-no-files-found: error
 
   sonar-analysis:
     name: SonarCloud Analysis
+    needs:
+      - unit-tests
+      - integration-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -133,19 +138,37 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: Generate reports
-        run: |
-          make unit-test
-          make integration-test
+      - name: Download unit test reports
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-test-reports
+          path: .
+      - name: Download integration coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: integration-reports
+          path: .
       - name: Run Sonar scan when configured
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_PR_NUMBER: ${{ github.event.pull_request.number }}
+          SONAR_PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          SONAR_PR_BASE: ${{ github.event.pull_request.base.ref }}
+        shell: bash
         run: |
           if [ -z "${SONAR_TOKEN}" ]; then
             echo "SONAR_TOKEN is not configured; skipping SonarCloud analysis."
             exit 0
           fi
-          ./ci.sh scan
+          PR_OPTS=()
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_OPTS+=("-Dsonar.pullrequest.key=${SONAR_PR_NUMBER}")
+            PR_OPTS+=("-Dsonar.pullrequest.branch=${SONAR_PR_BRANCH}")
+            PR_OPTS+=("-Dsonar.pullrequest.base=${SONAR_PR_BASE}")
+            PR_OPTS+=("-Dsonar.pullrequest.provider=github")
+          fi
+          ./ci.sh scan "${PR_OPTS[@]}"
 
   release-build:
     name: Release Build
