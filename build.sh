@@ -112,9 +112,8 @@ function run_unit_tests {
 
 function run_integration_tests {
     log_message "Running integration tests"
-    # integration tests
+    mkdir -p reports
     go test -v -tags=integration -covermode=atomic -coverpkg=./... -coverprofile=reports/coverage.integration.out ./...
-    go test -tags=integration -timeout=10m -run '^TestMain' ./...
 }
 
 function build_application {

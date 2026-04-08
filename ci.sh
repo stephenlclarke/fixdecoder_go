@@ -185,9 +185,8 @@ function integration_tests() {
   fi
 
   log_message ">> Running integration tests"
-  # integration tests
+  mkdir -p reports
   go test -v -tags=integration -covermode=atomic -coverpkg=./... -coverprofile=reports/coverage.integration.out ./...
-  go test -tags=integration -timeout=10m -run '^TestMain' ./...
 
   integration_tests=true
 }
@@ -198,7 +197,24 @@ function code_scan() {
   fi
 
   log_message ">> SonarQube Scan"
-  docker run --rm -e SONAR_TOKEN="${SONAR_TOKEN}" -v "$(pwd):/usr/src" sonarsource/sonar-scanner-cli
+  if [[ -z "${SONAR_TOKEN:-}" ]]; then
+    log_message ">> Sonar scan skipped; set SONAR_TOKEN to enable it"
+    code_scan=true
+    return
+  fi
+
+  if command -v sonar-scanner >/dev/null 2>&1; then
+    log_message ">> Using local sonar-scanner"
+    sonar-scanner -Dsonar.token="${SONAR_TOKEN}" "$@"
+  else
+    log_message ">> Local sonar-scanner not found, falling back to Docker image"
+    docker run --rm \
+      -e SONAR_TOKEN="${SONAR_TOKEN}" \
+      -v "$(pwd):/usr/src" \
+      sonarsource/sonar-scanner-cli \
+      -Dsonar.token="${SONAR_TOKEN}" \
+      "$@"
+  fi
 
   code_scan=true
 }
@@ -220,6 +236,11 @@ function common_preparation() {
 if [[ $# -eq 0 ]]; then
   log_message "usage: $0 {all|build|build-all|unit-test|integration-test|scan} [...]"
   exit 1
+fi
+
+if [[ "$1" == "scan" ]]; then
+  code_scan "${@:2}"
+  exit 0
 fi
 
 for target in "$@"; do

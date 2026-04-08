@@ -20,34 +20,6 @@ import (
 	"testing"
 )
 
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("os.Pipe() failed: %v", err)
-	}
-
-	os.Stdout = w
-	defer func() {
-		os.Stdout = oldStdout
-	}()
-
-	fn()
-
-	if err := w.Close(); err != nil {
-		t.Fatalf("stdout close failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("reading captured stdout failed: %v", err)
-	}
-
-	return buf.String()
-}
-
 func writeTempFile(t *testing.T, name, contents string) string {
 	t.Helper()
 
@@ -96,20 +68,19 @@ func TestProcessUsesParsedPositionalArgs(t *testing.T) {
 	}
 }
 
-func TestProcessXMLDoesNotFallThroughToPrettifyFiles(t *testing.T) {
-	xmlPath := writeTempFile(t, "schema.xml", `<fix major="4" minor="4"><fields></fields><messages></messages><components></components><header></header><trailer></trailer></fix>`)
+func TestProcessXMLUsesExternalDictionaryForPrettifyFiles(t *testing.T) {
+	xmlPath := writeTempFile(t, "schema.xml", `<fix major="4" minor="4"><fields><field number="35" name="ExternalMsgType"><value enum="A" description="ExternalLogon"/></field></fields><messages></messages><components></components><header></header><trailer></trailer></fix>`)
+	logPath := writeTempFile(t, "fix.log", "8=FIX.4.4\x0135=A\x0110=123\x01\n")
 
 	var out bytes.Buffer
 	var errOut bytes.Buffer
-	captureStdout(t, func() {
-		code := Process([]string{"-xml=" + xmlPath}, &out, &errOut)
-		if code != 0 {
-			t.Fatalf("Process() = %d, want 0; stderr=%q", code, errOut.String())
-		}
-	})
+	code := Process([]string{"-xml", xmlPath, logPath}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("Process() = %d, want 0; stderr=%q", code, errOut.String())
+	}
 
-	if strings.Contains(out.String(), "Processing:") {
-		t.Fatalf("expected -xml handler to stop before prettifying files, output=%q", out.String())
+	if !strings.Contains(out.String(), "ExternalMsgType") || !strings.Contains(out.String(), "ExternalLogon") {
+		t.Fatalf("expected prettifier to use external XML lookup, output=%q", out.String())
 	}
 }
 
@@ -131,14 +102,16 @@ func TestProcessWarnsOnUnsupportedFixVersion(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer
 
-	captureStdout(t, func() {
-		code := Process([]string{"-fix=99", "-message=A"}, &out, &errOut)
-		if code != 0 {
-			t.Fatalf("Process() = %d, want 0; stderr=%q", code, errOut.String())
-		}
-	})
+	code := Process([]string{"-fix=99", "-message=A"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("Process() = %d, want 0; stderr=%q", code, errOut.String())
+	}
 
 	if !strings.Contains(errOut.String(), `Unsupported FIX version "99"`) {
 		t.Fatalf("expected unsupported FIX warning, got %q", errOut.String())
+	}
+
+	if !strings.Contains(out.String(), "Message:") {
+		t.Fatalf("expected handler output to be written to supplied writer, output=%q", out.String())
 	}
 }
