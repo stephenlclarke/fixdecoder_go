@@ -66,6 +66,8 @@ function preferred_remote_url {
 
 function latest_tag {
     git tag --sort=-version:refname | head -n 1
+
+    return 0
 }
 function install_dependencies {
     log_message "Installing test dependencies"

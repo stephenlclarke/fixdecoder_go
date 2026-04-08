@@ -69,12 +69,10 @@ func writeIntegrationTempFile(t *testing.T, name, contents string) string {
 	return path
 }
 
-func TestBinaryUsesExternalXMLForPrettify(t *testing.T) {
-	binary := buildBinary(t)
-	xmlPath := writeIntegrationTempFile(t, "schema.xml", `<fix major="4" minor="4"><fields><field number="35" name="ExternalMsgType"><value enum="A" description="ExternalLogon"/></field></fields><messages></messages><components></components><header></header><trailer></trailer></fix>`)
-	logPath := writeIntegrationTempFile(t, "fix.log", "8=FIX.4.4\x0135=A\x0110=123\x01\n")
+func runBinary(t *testing.T, binary string, args ...string) (string, string) {
+	t.Helper()
 
-	cmd := exec.Command(binary, "-xml", xmlPath, logPath)
+	cmd := exec.Command(binary, args...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -84,12 +82,22 @@ func TestBinaryUsesExternalXMLForPrettify(t *testing.T) {
 		t.Fatalf("binary run failed: %v\nstderr=%s", err, stderr.String())
 	}
 
-	if !strings.Contains(stdout.String(), "ExternalMsgType") || !strings.Contains(stdout.String(), "ExternalLogon") {
-		t.Fatalf("expected binary output to use external XML lookup, stdout=%q", stdout.String())
+	return stdout.String(), stderr.String()
+}
+
+func TestBinaryUsesExternalXMLForPrettify(t *testing.T) {
+	binary := buildBinary(t)
+	xmlPath := writeIntegrationTempFile(t, "schema.xml", `<fix major="4" minor="4"><fields><field number="35" name="ExternalMsgType"><value enum="A" description="ExternalLogon"/></field></fields><messages></messages><components></components><header></header><trailer></trailer></fix>`)
+	logPath := writeIntegrationTempFile(t, "fix.log", "8=FIX.4.4\x0135=A\x0110=123\x01\n")
+
+	stdout, stderr := runBinary(t, binary, "-xml", xmlPath, logPath)
+
+	if !strings.Contains(stdout, "ExternalMsgType") || !strings.Contains(stdout, "ExternalLogon") {
+		t.Fatalf("expected binary output to use external XML lookup, stdout=%q", stdout)
 	}
 
-	if stderr.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	if stderr != "" {
+		t.Fatalf("expected no stderr output, got %q", stderr)
 	}
 }
 
@@ -97,21 +105,13 @@ func TestBinaryInfoReportsExternalDictionary(t *testing.T) {
 	binary := buildBinary(t)
 	xmlPath := writeIntegrationTempFile(t, "schema.xml", `<fix major="4" minor="4"><fields><field number="35" name="MsgType"/></fields><messages></messages><components></components><header></header><trailer></trailer></fix>`)
 
-	cmd := exec.Command(binary, "-xml", xmlPath, "-info")
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	stdout, stderr := runBinary(t, binary, "-xml", xmlPath, "-info")
 
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("binary run failed: %v\nstderr=%s", err, stderr.String())
+	if !strings.Contains(stdout, "Dictionary loaded from:") || !strings.Contains(stdout, "Current Schema:") {
+		t.Fatalf("expected schema summary output, stdout=%q", stdout)
 	}
 
-	if !strings.Contains(stdout.String(), "Dictionary loaded from:") || !strings.Contains(stdout.String(), "Current Schema:") {
-		t.Fatalf("expected schema summary output, stdout=%q", stdout.String())
-	}
-
-	if stderr.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", stderr.String())
+	if stderr != "" {
+		t.Fatalf("expected no stderr output, got %q", stderr)
 	}
 }
