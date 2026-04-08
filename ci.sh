@@ -221,12 +221,15 @@ function integration_tests() {
 }
 
 function code_scan() {
+  local sonar_token
+
   if [[ "${code_scan:-false}" == true ]]; then
     return
   fi
 
   log_message ">> SonarQube Scan"
-  if [[ -z "${SONAR_TOKEN:-}" ]]; then
+  sonar_token=$(printf '%s' "${SONAR_TOKEN:-}" | tr -d '\r\n')
+  if [[ -z "${sonar_token}" ]]; then
     log_message ">> Sonar scan skipped; set SONAR_TOKEN to enable it"
     code_scan=true
     return
@@ -234,15 +237,15 @@ function code_scan() {
 
   if command -v sonar-scanner >/dev/null 2>&1; then
     log_message ">> Using local sonar-scanner"
-    sonar-scanner -Dsonar.token="${SONAR_TOKEN}" "$@"
+    sonar-scanner -Dsonar.token="${sonar_token}" "$@"
   else
     log_message ">> Local sonar-scanner not found, falling back to Docker image with bundled Java"
     docker run --rm \
-      -e SONAR_TOKEN="${SONAR_TOKEN}" \
+      -e SONAR_TOKEN="${sonar_token}" \
       -e SONAR_SCANNER_SKIP_JRE_PROVISIONING=true \
       -v "$(pwd):/usr/src" \
       sonarsource/sonar-scanner-cli \
-      -Dsonar.token="${SONAR_TOKEN}" \
+      -Dsonar.token="${sonar_token}" \
       "$@"
   fi
 
