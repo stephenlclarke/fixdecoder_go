@@ -81,38 +81,56 @@ func handleMessage(opts CLIOptions, schema decoder.SchemaTree, out io.Writer) bo
 
 	switch opts.Message.value {
 	case "true": // bare -message
-		withCapturedStdout(out, func() {
-			if opts.ColumnOutput {
-				msgs := make([]string, 0, len(schema.Messages))
-				for _, m := range schema.Messages {
-					msg := fmt.Sprintf("%2s: %s (%s)", m.MsgType, m.Name, m.MsgCat)
-					msgs = append(msgs, msg)
-				}
-
-				sort.Strings(msgs)
-				decoder.PrintStringColumns(msgs)
-			} else {
-				decoder.ListAllMessages(schema)
-			}
-		})
-
+		handleBareMessage(schema, opts.ColumnOutput, out)
 	case "": // explicit -message=
 		PrintUsage(out)
 	default:
-		for _, m := range schema.Messages {
-			if m.Name == opts.Message.value || m.MsgType == opts.Message.value {
-				withCapturedStdout(out, func() {
-					decoder.DisplayMessageStructureWithOptions(schema, m, opts.Verbose, opts.IncludeHeader, opts.IncludeTrailer, opts.ColumnOutput, 4)
-				})
-				return true
-			}
-		}
-
-		fmt.Fprintf(out, "Message not found: %s\n", opts.Message.value)
-		return true
+		handleSpecificMessage(opts, schema, out)
 	}
 
 	return true
+}
+
+func handleBareMessage(schema decoder.SchemaTree, columnOutput bool, out io.Writer) {
+	withCapturedStdout(out, func() {
+		if columnOutput {
+			decoder.PrintStringColumns(sortedMessageSummaries(schema))
+		} else {
+			decoder.ListAllMessages(schema)
+		}
+	})
+}
+
+func handleSpecificMessage(opts CLIOptions, schema decoder.SchemaTree, out io.Writer) {
+	message, found := findMessage(schema, opts.Message.value)
+	if !found {
+		fmt.Fprintf(out, "Message not found: %s\n", opts.Message.value)
+		return
+	}
+
+	withCapturedStdout(out, func() {
+		decoder.DisplayMessageStructureWithOptions(schema, message, opts.Verbose, opts.IncludeHeader, opts.IncludeTrailer, opts.ColumnOutput, 4)
+	})
+}
+
+func sortedMessageSummaries(schema decoder.SchemaTree) []string {
+	msgs := make([]string, 0, len(schema.Messages))
+	for _, m := range schema.Messages {
+		msgs = append(msgs, fmt.Sprintf("%2s: %s (%s)", m.MsgType, m.Name, m.MsgCat))
+	}
+
+	sort.Strings(msgs)
+	return msgs
+}
+
+func findMessage(schema decoder.SchemaTree, query string) (decoder.MessageNode, bool) {
+	for _, m := range schema.Messages {
+		if m.Name == query || m.MsgType == query {
+			return m, true
+		}
+	}
+
+	return decoder.MessageNode{}, false
 }
 
 // handleTag processes the -tag flag. Returns true if handled.

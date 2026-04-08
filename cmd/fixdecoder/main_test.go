@@ -20,6 +20,8 @@ import (
 	"testing"
 )
 
+const processSuccessFormat = "Process() = %d, want 0; stderr=%q"
+
 func writeTempFile(t *testing.T, name, contents string) string {
 	t.Helper()
 
@@ -56,7 +58,7 @@ func TestProcessUsesParsedPositionalArgs(t *testing.T) {
 	code := Process([]string{"-fix", "44", logPath}, &out, &errOut)
 
 	if code != 0 {
-		t.Fatalf("Process() = %d, want 0; stderr=%q", code, errOut.String())
+		t.Fatalf(processSuccessFormat, code, errOut.String())
 	}
 
 	if strings.Contains(errOut.String(), "open 44") {
@@ -76,7 +78,7 @@ func TestProcessXMLUsesExternalDictionaryForPrettifyFiles(t *testing.T) {
 	var errOut bytes.Buffer
 	code := Process([]string{"-xml", xmlPath, logPath}, &out, &errOut)
 	if code != 0 {
-		t.Fatalf("Process() = %d, want 0; stderr=%q", code, errOut.String())
+		t.Fatalf(processSuccessFormat, code, errOut.String())
 	}
 
 	if !strings.Contains(out.String(), "ExternalMsgType") || !strings.Contains(out.String(), "ExternalLogon") {
@@ -104,7 +106,7 @@ func TestProcessWarnsOnUnsupportedFixVersion(t *testing.T) {
 
 	code := Process([]string{"-fix=99", "-message=A"}, &out, &errOut)
 	if code != 0 {
-		t.Fatalf("Process() = %d, want 0; stderr=%q", code, errOut.String())
+		t.Fatalf(processSuccessFormat, code, errOut.String())
 	}
 
 	if !strings.Contains(errOut.String(), `Unsupported FIX version "99"`) {

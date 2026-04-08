@@ -115,10 +115,10 @@ func TestFixTagLookupGetEnumDescription(t *testing.T) {
 	if got := d.GetEnumDescription(40, "2"); got != "Limit" {
 		t.Errorf("unexpected enum desc: %s", got)
 	}
-	if got := d.GetEnumDescription(40, "999"); got != "" {
+	if d.GetEnumDescription(40, "999") != "" {
 		t.Error("expected empty string for missing enum")
 	}
-	if got := d.GetEnumDescription(999, "1"); got != "" {
+	if d.GetEnumDescription(999, "1") != "" {
 		t.Error("expected empty string for missing tag")
 	}
 }

@@ -152,6 +152,9 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_PR_NUMBER: ${{ github.event.pull_request.number }}
+          SONAR_PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          SONAR_PR_BASE: ${{ github.event.pull_request.base.ref }}
         shell: bash
         run: |
           if [ -z "${SONAR_TOKEN}" ]; then
@@ -160,9 +163,9 @@ jobs:
           fi
           PR_OPTS=()
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            PR_OPTS+=("-Dsonar.pullrequest.key=${{ github.event.pull_request.number }}")
-            PR_OPTS+=("-Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }}")
-            PR_OPTS+=("-Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }}")
+            PR_OPTS+=("-Dsonar.pullrequest.key=${SONAR_PR_NUMBER}")
+            PR_OPTS+=("-Dsonar.pullrequest.branch=${SONAR_PR_BRANCH}")
+            PR_OPTS+=("-Dsonar.pullrequest.base=${SONAR_PR_BASE}")
             PR_OPTS+=("-Dsonar.pullrequest.provider=github")
           fi
           ./ci.sh scan "${PR_OPTS[@]}"

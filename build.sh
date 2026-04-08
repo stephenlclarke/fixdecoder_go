@@ -29,13 +29,19 @@ MODULES=(
 )
 
 function log_message {
-    echo -e "\n\033[1;32m$1\033[0m"
+    local message=$1
+    echo -e "\n\033[1;32m${message}\033[0m"
 }
 
 function setup_environment {
+    local go_path
+
     log_message "Setting up environment"
-    export GOPATH=$(go env GOPATH)
-    export PATH="$(go env GOPATH)/bin:$PATH"
+    go_path=$(go env GOPATH)
+    export GOPATH="${go_path}"
+    export PATH="${go_path}/bin:$PATH"
+
+    return 0
 }
 
 function preferred_remote_name {
@@ -60,29 +66,40 @@ function preferred_remote_url {
 function install_dependencies {
     log_message "Installing test dependencies"
     go install github.com/jstemmer/go-junit-report/v2@latest
+
+    return 0
 }
 
 function tidy {
     log_message "Running go mod tidy in all modules"
     go mod tidy
     go mod download
+
+    return 0
 }
 
 function generate_fix {
     log_message "Auto-Generating FIX dictionary"
     chmod +x ./resources/generate_fix_go.sh
     ./resources/generate_fix_go.sh
-}   
+
+    return 0
+}
 
 function run_unit_tests {
+    local report_dir
+    local abs_report_path
+    local report_name
+
     log_message "Running unit tests"
     mkdir -p reports
     rm -f coverage.out
-    for module in ${MODULES[@]}; do
+    report_dir=$(cd reports && pwd)
+    for module in "${MODULES[@]}"; do
         echo " - Testing $module"
-        abs_report_path=$(cd reports && pwd)/coverage-`basename $module`.out
-        cd $module
-        go test -v -covermode=atomic -coverprofile=$abs_report_path .
+        abs_report_path="${report_dir}/coverage-$(basename "$module").out"
+        cd "$module"
+        go test -v -covermode=atomic -coverprofile="${abs_report_path}" .
         cd - >/dev/null
     done
 
@@ -92,13 +109,12 @@ function run_unit_tests {
 
     log_message "Generating JUnit test reports per module"
     mkdir -p reports
-    REPORT_DIR=$(cd reports && pwd)
-    for module in ${MODULES[@]}; do
-        report_name=$(echo $module | tr / -)
-        printf " - Creating report for %s\n" $report_name
-        abs_report_path=$(cd reports && pwd)/test-report-$report_name.xml
-        cd $module
-        go test -json . | go-junit-report > $abs_report_path
+    for module in "${MODULES[@]}"; do
+        report_name=$(echo "$module" | tr / -)
+        printf " - Creating report for %s\n" "$report_name"
+        abs_report_path="${report_dir}/test-report-${report_name}.xml"
+        cd "$module"
+        go test -json . | go-junit-report > "${abs_report_path}"
         cd - >/dev/null
     done
 
@@ -108,16 +124,25 @@ function run_unit_tests {
     log_message "Generating HTML coverage report"
     go tool cover -html=reports/coverage.out -o reports/coverage.html
     log_message "HTML report available at reports/coverage.html"
+
+    return 0
 }
 
 function run_integration_tests {
     log_message "Running integration tests"
     mkdir -p reports
     go test -v -tags=integration -covermode=atomic -coverpkg=./... -coverprofile=reports/coverage.integration.out ./...
+
+    return 0
 }
 
 function build_application {
     local remote
+    local tag
+    local version
+    local branch
+    local short_sha
+    local url
 
     log_message "Building the application"
     # ensure the bin directory exists
@@ -130,19 +155,21 @@ function build_application {
     fi
 
     # grab the latest tag and construct a version string (e.g. "v1.2.3")
-    TAG=$(git describe --tags --abbrev=0 2>/dev/null)
-    VERSION=${TAG:="v0.0.0"}
-    [[ -n "$(git status --porcelain)" ]] && VERSION="${VERSION}-dirty"
+    tag=$(git describe --tags --abbrev=0 2>/dev/null)
+    version=${tag:="v0.0.0"}
+    [[ -n "$(git status --porcelain)" ]] && version="${version}-dirty"
 
-    BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    SHORT_SHA=$(git rev-parse --short HEAD)
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    short_sha=$(git rev-parse --short HEAD)
 
-    URL=$(preferred_remote_url 2>/dev/null || true)
+    url=$(preferred_remote_url 2>/dev/null || true)
 
-    log_message "Building the application ${VERSION} (branch: ${BRANCH}, commit: ${SHORT_SHA})"
+    log_message "Building the application ${version} (branch: ${branch}, commit: ${short_sha})"
 
     # build with that version baked in
-    go build -ldflags="-X main.Version=${VERSION} -X main.Branch=${BRANCH} -X main.Sha=${SHORT_SHA} -X main.GitUrl=${URL}" -o ./bin/fixdecoder ./cmd/fixdecoder
+    go build -ldflags="-X main.Version=${version} -X main.Branch=${branch} -X main.Sha=${short_sha} -X main.GitUrl=${url}" -o ./bin/fixdecoder ./cmd/fixdecoder
+
+    return 0
 }
 
 setup_environment
