@@ -37,4 +37,4 @@ help:
 	@echo "  unit-test          → $(CI_SCRIPT) unit-test"
 	@echo "  integration-test   → $(CI_SCRIPT) integration-test"
 	@echo "  scan               → $(CI_SCRIPT) scan"
-	@echo "  regen-readme       → regenerate README Build It examples"
+	@echo "  regen-readme       → regenerate README Build It, usage, capability, and CLI examples"
