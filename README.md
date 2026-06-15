@@ -140,6 +140,72 @@ $ scripts/fixdecoder --fix=44 --tag=35 --verbose
        5 : LOGOUT
 ```
 
+<!-- regen-readme:start --section=build-examples -->
+
+## Build it
+
+Build it from source. This requires `bash` and a recent Go toolchain.
+
+```bash
+❯ bash --version
+GNU bash, version 5.3.15(1)-release (aarch64-apple-darwin25.4.0)
+Copyright (C) 2025 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+```
+
+```bash
+❯ go version
+go version go1.26.4 darwin/arm64
+```
+
+Clone the git repo.
+
+```bash
+❯ git clone git@github.com:stephenlclarke/fixdecoder_go.git
+Cloning into 'fixdecoder_go'...
+...
+❯ cd fixdecoder_go
+```
+
+Then build it. Local builds compile the binary and run the test suites used by CI.
+
+```bash
+❯ make build unit-test integration-test
+
+>> Setting up environment
+>> Running go mod tidy in all modules
+>> Building the application
+>> Running unit tests
+>> Running integration tests
+```
+
+Build all release-style binaries.
+
+```bash
+❯ make build-all
+
+>> Building for OS: darwin, ARCH: arm64
+>> Building for OS: linux, ARCH: arm64
+>> Building for OS: linux, ARCH: amd64
+>> Building for OS: windows, ARCH: amd64
+```
+
+Run it (from the release build) and check the version details:
+
+```bash
+❯ ./bin/fixdecoder --version
+fixdecoder v1.0.0 (branch:main, commit:760725c)
+```
+
+Run the same build through the source-checkout wrapper:
+
+```bash
+❯ scripts/fixdecoder --version
+fixdecoder v1.0.0 (branch:main, commit:760725c)
+```
+
+<!-- regen-readme:end --section=build-examples -->
+
 ## Development
 
 The local workflow uses Go and the repo's `ci.sh` wrapper.

@@ -16,7 +16,7 @@
 CI_SCRIPT := ./ci.sh
 
 # The targets your pipeline (and developers) will call
-.PHONY: build build-all unit-test integration-test scan security-scan help
+.PHONY: build build-all unit-test integration-test scan security-scan regen-readme help
 
 # Straight-through wrappers: “make build” → “./ci.sh build”, etc.
 build build-all unit-test integration-test scan:
@@ -26,6 +26,9 @@ build build-all unit-test integration-test scan:
 security-scan:
 	$(CI_SCRIPT) scan
 
+regen-readme:
+	python3 ci/regen_readme.py
+
 # Simple help text
 help:
 	@echo "Available targets:"
@@ -34,3 +37,4 @@ help:
 	@echo "  unit-test          → $(CI_SCRIPT) unit-test"
 	@echo "  integration-test   → $(CI_SCRIPT) integration-test"
 	@echo "  scan               → $(CI_SCRIPT) scan"
+	@echo "  regen-readme       → regenerate README Build It examples"
