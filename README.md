@@ -179,7 +179,7 @@ Then build it. Local builds compile the binary and run the test suites used by C
 >> Running integration tests
 ```
 
-Build all release-style binaries.
+Build all release-style fixdecoder binaries.
 
 ```bash
 ❯ make build-all
@@ -194,14 +194,14 @@ Run it (from the release build) and check the version details:
 
 ```bash
 ❯ ./bin/fixdecoder --version
-fixdecoder v1.0.0 (branch:main, commit:760725c)
+fixdecoder v1.0.0 (branch:main, commit:5a2a063)
 ```
 
 Run the same build through the source-checkout wrapper:
 
 ```bash
 ❯ scripts/fixdecoder --version
-fixdecoder v1.0.0 (branch:main, commit:760725c)
+fixdecoder v1.0.0 (branch:main, commit:5a2a063)
 ```
 
 <!-- regen-readme:end --section=build-examples -->

@@ -123,7 +123,7 @@ def render_build_examples_section() -> str:
             format_prompted_output(examples[3]),
             "```",
             "",
-            "Build all release-style binaries.",
+            "Build all release-style fixdecoder binaries.",
             "",
             "```bash",
             format_prompted_output(examples[4]),
