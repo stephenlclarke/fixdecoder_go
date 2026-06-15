@@ -57,18 +57,20 @@ This Go implementation is intentionally simpler than the [Rust](https://github.c
 make build
 
 # Stream and prettify stdin
-cat fixlog.txt | ./bin/fixdecoder
+cat fixlog.txt | scripts/fixdecoder
 
 # Decode one or more files
-./bin/fixdecoder logs/fix.log logs/fix2.log
+scripts/fixdecoder logs/fix.log logs/fix2.log
 
 # Browse dictionary definitions
-./bin/fixdecoder -fix=44 -message=D -verbose -column -header -trailer
+scripts/fixdecoder -fix=44 -message=D -verbose -column -header -trailer
 ```
 
 ## Running the fixdecoder utility
 
 You can run fixdecoder anywhere you can run a Go binary. The standard build embeds FIX dictionaries for FIX 4.0 through FIX 5.0 SP2 plus FIXT 1.1, and `-xml` can point at an alternative QuickFIX XML file for custom dictionaries.
+
+From a source checkout, `scripts/fixdecoder` runs the local `bin/fixdecoder` produced by `make build`; set `FIXDECODER_BIN=/path/to/fixdecoder` to override discovery.
 
 ```text
 fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-message[=MSG] [-verbose] [-column] [-header] [-trailer]]
@@ -91,7 +93,7 @@ fixdecoder [file1.log file2.log ...]
 The FIX SOH delimiter is shown as `<SOH>` below for readability.
 
 ```bash
-$ cat fixlog.txt | ./bin/fixdecoder
+$ cat fixlog.txt | scripts/fixdecoder
 Processing: (stdin)
 
 8=FIX.4.4<SOH>9=22<SOH>35=0<SOH>49=BUY1<SOH>56=SELL1<SOH>10=168<SOH>
@@ -106,7 +108,7 @@ Processing: (stdin)
 ### Inspect a message
 
 ```bash
-$ ./bin/fixdecoder -fix=44 -message=D -header -trailer
+$ scripts/fixdecoder -fix=44 -message=D -header -trailer
 Message: NewOrderSingle (D)
     Component: Header
            8: BeginString (STRING) - (Y)
@@ -126,7 +128,7 @@ Message: NewOrderSingle (D)
 ### Inspect a tag
 
 ```bash
-$ ./bin/fixdecoder -fix=44 -tag=35 -verbose
+$ scripts/fixdecoder -fix=44 -tag=35 -verbose
   35: MsgType (STRING)
        0 : HEARTBEAT
        1 : TEST_REQUEST
