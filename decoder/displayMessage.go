@@ -45,8 +45,28 @@ func DisplayMessageStructureWithOptions(
 ) {
 	printMessageStart(msg)
 	printHeader(schema, msg, includeHeader, verbose, column, indent)
-	printFields(msg, verbose, column, indent)
-	printComponents(schema, msg, verbose, column, indent)
-	printGroups(schema, msg, verbose, column, indent)
+	printIndent(indent)
+	fmt.Println("Message: Body")
+	renderContainerEntries(schema, msg, messageEntries(msg), verbose, column, indent+nestIndent)
 	printTrailer(schema, msg, includeTrailer, verbose, column, indent)
+}
+
+// messageEntries returns ordered entries, falling back to legacy bucket fields for tests.
+func messageEntries(msg MessageNode) []ContainerNode {
+	if len(msg.Entries) > 0 {
+		return msg.Entries
+	}
+
+	entries := make([]ContainerNode, 0, len(msg.Fields)+len(msg.Components)+len(msg.Groups))
+	for _, field := range msg.Fields {
+		entries = append(entries, ContainerNode{Kind: containerField, Field: field})
+	}
+	for _, component := range msg.Components {
+		entries = append(entries, ContainerNode{Kind: containerComponent, Component: component})
+	}
+	for _, group := range msg.Groups {
+		entries = append(entries, ContainerNode{Kind: containerGroup, Group: group})
+	}
+
+	return entries
 }

@@ -13,6 +13,7 @@
 package decoder
 
 import (
+	"encoding/xml"
 	"testing"
 )
 
@@ -126,6 +127,53 @@ func TestBuildSchemaWithMessage(t *testing.T) {
 	}
 	if msg.MsgType != "D" {
 		t.Error("Incorrect MsgType for NewOrderSingle")
+	}
+}
+
+func TestBuildSchemaPreservesContainerEntryOrder(t *testing.T) {
+	raw := `
+<fix major="4" minor="4">
+  <fields>
+    <field number="11" name="ClOrdID" type="STRING" />
+    <field number="55" name="Symbol" type="STRING" />
+    <field number="448" name="PartyID" type="STRING" />
+    <field number="453" name="NoPartyIDs" type="NUMINGROUP" />
+  </fields>
+  <messages>
+    <message name="NewOrderSingle" msgtype="D" msgcat="app">
+      <field name="ClOrdID" required="Y" />
+      <component name="Parties" required="N" />
+      <field name="Symbol" required="Y" />
+    </message>
+  </messages>
+  <components>
+    <component name="Parties">
+      <group name="NoPartyIDs" required="N">
+        <field name="PartyID" required="Y" />
+      </group>
+    </component>
+  </components>
+  <header />
+  <trailer />
+</fix>`
+	var dict FixDictionary
+	if err := xml.Unmarshal([]byte(raw), &dict); err != nil {
+		t.Fatalf("unmarshal dictionary: %v", err)
+	}
+
+	tree := BuildSchema(dict)
+	msg := tree.Messages["NewOrderSingle"]
+	if len(msg.Entries) != 3 {
+		t.Fatalf("expected three ordered message entries, got %d", len(msg.Entries))
+	}
+	if msg.Entries[0].Kind != containerField || msg.Entries[0].Field.Field.Name != "ClOrdID" {
+		t.Fatalf("first message entry should be ClOrdID field: %#v", msg.Entries[0])
+	}
+	if msg.Entries[1].Kind != containerComponent || msg.Entries[1].Component.Name != "Parties" {
+		t.Fatalf("second message entry should be Parties component: %#v", msg.Entries[1])
+	}
+	if msg.Entries[2].Kind != containerField || msg.Entries[2].Field.Field.Name != "Symbol" {
+		t.Fatalf("third message entry should be Symbol field: %#v", msg.Entries[2])
 	}
 }
 

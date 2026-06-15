@@ -17,34 +17,52 @@ import (
 	"fmt"
 )
 
-// displayGroup displays a GroupNode with its fields, components, and nested groups.
+// displayGroup displays a GroupNode with its count field and ordered children.
 func DisplayGroup(schema SchemaTree, g GroupNode, verbose bool, columnOutput bool, indent int) {
-	printIndent(indent)
-	fmt.Printf("Group: %s%s\n", g.Name, formatRequired(g.Required))
+	renderGroup(schema, MessageNode{}, g, verbose, columnOutput, indent)
+}
 
-	for _, f := range g.Fields {
-		printField(f, indent+4)
-		if verbose && columnOutput {
-			printEnumColumns(f.Field.Values, indent+6)
-		} else if verbose {
-			for _, val := range f.Field.Values {
-				printEnum(val.Enum, val.Description, indent+6)
-			}
-		}
+// renderGroup keeps the No* count tag at the current indent and nests only group members.
+func renderGroup(schema SchemaTree, msg MessageNode, g GroupNode, verbose bool, columnOutput bool, indent int) {
+	if field, ok := schema.Fields[g.Name]; ok {
+		renderField(
+			FieldNode{Ref: FieldRef{Name: g.Name, Required: g.Required}, Field: field},
+			msg,
+			verbose,
+			columnOutput,
+			indent,
+		)
+	} else {
+		printIndent(indent)
+		fmt.Printf("Group: %s%s\n", g.Name, formatRequired(g.Required))
 	}
 
-	for _, c := range g.Components {
-		DisplayComponent(schema, MessageNode{}, c, verbose, columnOutput, indent+4)
+	renderContainerEntries(schema, msg, groupEntries(g), verbose, columnOutput, indent+schemaGroupChildIndent)
+}
+
+// groupEntries returns ordered entries, falling back to legacy bucket fields for tests.
+func groupEntries(g GroupNode) []ContainerNode {
+	if len(g.Entries) > 0 {
+		return g.Entries
 	}
 
-	for _, sg := range g.Groups {
-		DisplayGroup(schema, sg, verbose, columnOutput, indent+4)
+	entries := make([]ContainerNode, 0, len(g.Fields)+len(g.Components)+len(g.Groups))
+	for _, field := range g.Fields {
+		entries = append(entries, ContainerNode{Kind: containerField, Field: field})
 	}
+	for _, component := range g.Components {
+		entries = append(entries, ContainerNode{Kind: containerComponent, Component: component})
+	}
+	for _, group := range g.Groups {
+		entries = append(entries, ContainerNode{Kind: containerGroup, Group: group})
+	}
+
+	return entries
 }
 
 // printGroups prints all repeating groups of the message.
 func printGroups(schema SchemaTree, msg MessageNode, verbose, column bool, indent int) {
 	for _, g := range msg.Groups {
-		DisplayGroup(schema, g, verbose, column, indent)
+		renderGroup(schema, msg, g, verbose, column, indent)
 	}
 }

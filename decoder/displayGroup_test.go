@@ -14,6 +14,7 @@ package decoder
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -31,7 +32,7 @@ func TestDisplayGroupBasic(t *testing.T) {
 	got := captureStdout(func() {
 		DisplayGroup(SchemaTree{}, group, false, false, 0)
 	})
-	if want := "Group: Group1 - (Y)\n    10  : F1 (INT) - (Y)\n"; got[:len(want)] != want {
+	if want := "Group: Group1 - (Y)\n        10: F1 (INT) - (Y)\n"; got[:len(want)] != want {
 		t.Errorf("unexpected output: got %q, want %q", got, want)
 	}
 }
@@ -100,4 +101,54 @@ func TestDisplayGroupNestedComponentsAndGroups(t *testing.T) {
 	if !bytes.Contains([]byte(got), []byte("Group: InnerGroup")) {
 		t.Errorf("expected inner group, got %q", got)
 	}
+}
+
+func TestDisplayGroupCountFieldStaysOutsideMemberIndent(t *testing.T) {
+	schema := SchemaTree{
+		Fields: map[string]Field{
+			"NoPartyIDs":    {Name: "NoPartyIDs", Number: 453, Type: "NUMINGROUP"},
+			"PartyID":       {Name: "PartyID", Number: 448, Type: "STRING"},
+			"NoPartySubIDs": {Name: "NoPartySubIDs", Number: 802, Type: "NUMINGROUP"},
+			"PartySubID":    {Name: "PartySubID", Number: 523, Type: "STRING"},
+		},
+	}
+	group := GroupNode{
+		Name: "NoPartyIDs",
+		Entries: []ContainerNode{
+			{
+				Kind:  containerField,
+				Field: FieldNode{Ref: FieldRef{Name: "PartyID"}, Field: schema.Fields["PartyID"]},
+			},
+			{
+				Kind: containerGroup,
+				Group: GroupNode{
+					Name: "NoPartySubIDs",
+					Entries: []ContainerNode{
+						{
+							Kind:  containerField,
+							Field: FieldNode{Ref: FieldRef{Name: "PartySubID"}, Field: schema.Fields["PartySubID"]},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	got := captureStdout(func() {
+		DisplayGroup(schema, group, false, false, 0)
+	})
+	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+	if len(lines) != 4 {
+		t.Fatalf("expected four rendered lines, got %d:\n%s", len(lines), got)
+	}
+	if leadingSpaces(lines[1]) != leadingSpaces(lines[0])+schemaGroupChildIndent {
+		t.Fatalf("group count should be outside member indent:\n%s", got)
+	}
+	if leadingSpaces(lines[3]) != leadingSpaces(lines[2])+schemaGroupChildIndent {
+		t.Fatalf("nested group count should be outside member indent:\n%s", got)
+	}
+}
+
+func leadingSpaces(line string) int {
+	return len(line) - len(strings.TrimLeft(line, " "))
 }

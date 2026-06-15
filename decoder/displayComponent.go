@@ -73,23 +73,72 @@ func printTrailer(schema SchemaTree, msg MessageNode, includeTrailer, verbose, c
 }
 
 func DisplayComponent(schema SchemaTree, msg MessageNode, comp ComponentNode, verbose bool, columnOutput bool, indent int) {
-	printIndent(indent)
-	fmt.Printf("Component: %s\n", comp.Name)
+	renderComponent(schema, msg, comp, verbose, columnOutput, indent, indent+nestIndent)
+}
 
-	for _, f := range comp.Fields {
-		printField(f, indent+4)
-		if verbose {
-			printEnums(f, msg, columnOutput, indent+6)
+// renderComponent prints a component label at headerIndent and its children at fieldIndent.
+func renderComponent(
+	schema SchemaTree,
+	msg MessageNode,
+	comp ComponentNode,
+	verbose bool,
+	columnOutput bool,
+	headerIndent int,
+	fieldIndent int,
+) {
+	printIndent(headerIndent)
+	fmt.Printf("Component: %s\n", comp.Name)
+	renderContainerEntries(schema, msg, componentEntries(comp), verbose, columnOutput, fieldIndent)
+}
+
+// renderContainerEntries renders fields, component headings, and group count fields in dictionary order.
+func renderContainerEntries(
+	schema SchemaTree,
+	msg MessageNode,
+	entries []ContainerNode,
+	verbose bool,
+	columnOutput bool,
+	fieldIndent int,
+) {
+	for _, entry := range entries {
+		switch entry.Kind {
+		case containerField:
+			renderField(entry.Field, msg, verbose, columnOutput, fieldIndent)
+		case containerComponent:
+			headerIndent := componentHeaderIndent(fieldIndent)
+			renderComponent(schema, msg, entry.Component, verbose, columnOutput, headerIndent, fieldIndent)
+		case containerGroup:
+			renderGroup(schema, msg, entry.Group, verbose, columnOutput, fieldIndent)
 		}
 	}
+}
 
-	for _, c := range comp.Components {
-		DisplayComponent(schema, msg, c, verbose, columnOutput, indent+4)
+// renderField prints a field plus optional enum detail using the shared indent rules.
+func renderField(field FieldNode, msg MessageNode, verbose bool, columnOutput bool, indent int) {
+	printField(field, indent)
+	if verbose {
+		printEnums(field, msg, columnOutput, indent+2)
+	}
+}
+
+// componentEntries returns ordered entries, falling back to legacy bucket fields for tests.
+func componentEntries(comp ComponentNode) []ContainerNode {
+	if len(comp.Entries) > 0 {
+		return comp.Entries
 	}
 
-	for _, g := range comp.Groups {
-		DisplayGroup(schema, g, verbose, columnOutput, indent+4)
+	entries := make([]ContainerNode, 0, len(comp.Fields)+len(comp.Components)+len(comp.Groups))
+	for _, field := range comp.Fields {
+		entries = append(entries, ContainerNode{Kind: containerField, Field: field})
 	}
+	for _, component := range comp.Components {
+		entries = append(entries, ContainerNode{Kind: containerComponent, Component: component})
+	}
+	for _, group := range comp.Groups {
+		entries = append(entries, ContainerNode{Kind: containerGroup, Group: group})
+	}
+
+	return entries
 }
 
 // Helper to handle enum display logic

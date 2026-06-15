@@ -46,19 +46,38 @@ type FieldRef struct {
 	Required string `xml:"required,attr"`
 }
 
+// ContainerEntryKind identifies the kind of dictionary entry preserved from XML order.
+type ContainerEntryKind int
+
+const (
+	containerField ContainerEntryKind = iota
+	containerGroup
+	containerComponent
+)
+
+// ContainerEntry preserves the ordered field/component/group stream inside a FIX container.
+type ContainerEntry struct {
+	Kind      ContainerEntryKind
+	Field     FieldRef
+	Group     Group
+	Component ComponentRef
+}
+
 type Group struct {
-	Name       string         `xml:"name,attr"`
-	Required   string         `xml:"required,attr"`
-	Fields     []FieldRef     `xml:"field"`
-	Groups     []Group        `xml:"group"`
-	Components []ComponentRef `xml:"component"`
+	Name       string           `xml:"name,attr"`
+	Required   string           `xml:"required,attr"`
+	Fields     []FieldRef       `xml:"field"`
+	Groups     []Group          `xml:"group"`
+	Components []ComponentRef   `xml:"component"`
+	Entries    []ContainerEntry `xml:"-"`
 }
 
 type Component struct {
-	Name       string         `xml:"name,attr"`
-	Fields     []FieldRef     `xml:"field"`
-	Groups     []Group        `xml:"group"`
-	Components []ComponentRef `xml:"component"`
+	Name       string           `xml:"name,attr"`
+	Fields     []FieldRef       `xml:"field"`
+	Groups     []Group          `xml:"group"`
+	Components []ComponentRef   `xml:"component"`
+	Entries    []ContainerEntry `xml:"-"`
 }
 
 type ComponentRef struct {
@@ -67,12 +86,13 @@ type ComponentRef struct {
 }
 
 type Message struct {
-	Name       string         `xml:"name,attr"`
-	MsgType    string         `xml:"msgtype,attr"`
-	MsgCat     string         `xml:"msgcat,attr"`
-	Fields     []FieldRef     `xml:"field"`
-	Groups     []Group        `xml:"group"`
-	Components []ComponentRef `xml:"component"`
+	Name       string           `xml:"name,attr"`
+	MsgType    string           `xml:"msgtype,attr"`
+	MsgCat     string           `xml:"msgcat,attr"`
+	Fields     []FieldRef       `xml:"field"`
+	Groups     []Group          `xml:"group"`
+	Components []ComponentRef   `xml:"component"`
+	Entries    []ContainerEntry `xml:"-"`
 }
 
 type FieldNode struct {
@@ -85,6 +105,7 @@ type ComponentNode struct {
 	Fields     []FieldNode
 	Components []ComponentNode
 	Groups     []GroupNode
+	Entries    []ContainerNode
 }
 
 type GroupNode struct {
@@ -93,6 +114,7 @@ type GroupNode struct {
 	Fields     []FieldNode
 	Components []ComponentNode
 	Groups     []GroupNode
+	Entries    []ContainerNode
 }
 
 type MessageNode struct {
@@ -102,6 +124,15 @@ type MessageNode struct {
 	Fields     []FieldNode
 	Components []ComponentNode
 	Groups     []GroupNode
+	Entries    []ContainerNode
+}
+
+// ContainerNode is the resolved, ordered display node used by schema renderers.
+type ContainerNode struct {
+	Kind      ContainerEntryKind
+	Field     FieldNode
+	Group     GroupNode
+	Component ComponentNode
 }
 
 type SchemaTree struct {
@@ -110,6 +141,110 @@ type SchemaTree struct {
 	Components  map[string]ComponentNode
 	Version     string
 	ServicePack string
+}
+
+// UnmarshalXML preserves the dictionary order of entries inside a component.
+func (c *Component) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
+	c.Name = xmlAttr(start, "name")
+	return decodeContainerEntries(dec, start, func(entry ContainerEntry) {
+		c.Entries = append(c.Entries, entry)
+		switch entry.Kind {
+		case containerField:
+			c.Fields = append(c.Fields, entry.Field)
+		case containerGroup:
+			c.Groups = append(c.Groups, entry.Group)
+		case containerComponent:
+			c.Components = append(c.Components, entry.Component)
+		}
+	})
+}
+
+// UnmarshalXML preserves the dictionary order of entries inside a repeating group.
+func (g *Group) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
+	g.Name = xmlAttr(start, "name")
+	g.Required = xmlAttr(start, "required")
+	return decodeContainerEntries(dec, start, func(entry ContainerEntry) {
+		g.Entries = append(g.Entries, entry)
+		switch entry.Kind {
+		case containerField:
+			g.Fields = append(g.Fields, entry.Field)
+		case containerGroup:
+			g.Groups = append(g.Groups, entry.Group)
+		case containerComponent:
+			g.Components = append(g.Components, entry.Component)
+		}
+	})
+}
+
+// UnmarshalXML preserves the dictionary order of entries inside a message.
+func (m *Message) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) error {
+	m.Name = xmlAttr(start, "name")
+	m.MsgType = xmlAttr(start, "msgtype")
+	m.MsgCat = xmlAttr(start, "msgcat")
+	return decodeContainerEntries(dec, start, func(entry ContainerEntry) {
+		m.Entries = append(m.Entries, entry)
+		switch entry.Kind {
+		case containerField:
+			m.Fields = append(m.Fields, entry.Field)
+		case containerGroup:
+			m.Groups = append(m.Groups, entry.Group)
+		case containerComponent:
+			m.Components = append(m.Components, entry.Component)
+		}
+	})
+}
+
+// decodeContainerEntries reads container children while retaining XML order.
+func decodeContainerEntries(dec *xml.Decoder, start xml.StartElement, accept func(ContainerEntry)) error {
+	for {
+		token, err := dec.Token()
+		if err != nil {
+			return err
+		}
+
+		switch node := token.(type) {
+		case xml.StartElement:
+			switch node.Name.Local {
+			case "field":
+				var field FieldRef
+				if err := dec.DecodeElement(&field, &node); err != nil {
+					return err
+				}
+				accept(ContainerEntry{Kind: containerField, Field: field})
+			case "group":
+				var group Group
+				if err := dec.DecodeElement(&group, &node); err != nil {
+					return err
+				}
+				accept(ContainerEntry{Kind: containerGroup, Group: group})
+			case "component":
+				var component ComponentRef
+				if err := dec.DecodeElement(&component, &node); err != nil {
+					return err
+				}
+				accept(ContainerEntry{Kind: containerComponent, Component: component})
+			default:
+				if err := dec.Skip(); err != nil {
+					return err
+				}
+			}
+		case xml.EndElement:
+			if node.Name.Local == start.Name.Local {
+				return nil
+			}
+		}
+	}
+}
+
+// xmlAttr returns an attribute value from a start element.
+func xmlAttr(start xml.StartElement, name string) string {
+	for _, attr := range start.Attr {
+		if attr.Name.Local == name {
+			return attr.Value
+		}
+	}
+
+	return ""
 }
 
 func BuildSchema(dict FixDictionary) SchemaTree {
@@ -165,10 +300,41 @@ func buildFieldNodes(refs []FieldRef, fieldMap map[string]Field) []FieldNode {
 	return nodes
 }
 
+// buildContainerNodes resolves ordered XML entries into display nodes.
+func buildContainerNodes(entries []ContainerEntry, fieldMap map[string]Field, compMap map[string]Component) []ContainerNode {
+	nodes := make([]ContainerNode, 0, len(entries))
+	for _, entry := range entries {
+		switch entry.Kind {
+		case containerField:
+			if field, ok := fieldMap[entry.Field.Name]; ok {
+				nodes = append(nodes, ContainerNode{
+					Kind:  containerField,
+					Field: FieldNode{Ref: entry.Field, Field: field},
+				})
+			}
+		case containerGroup:
+			nodes = append(nodes, ContainerNode{
+				Kind:  containerGroup,
+				Group: buildGroupNode(entry.Group, fieldMap, compMap),
+			})
+		case containerComponent:
+			if component, ok := compMap[entry.Component.Name]; ok {
+				nodes = append(nodes, ContainerNode{
+					Kind:      containerComponent,
+					Component: buildComponentNode(component, fieldMap, compMap),
+				})
+			}
+		}
+	}
+
+	return nodes
+}
+
 func buildComponentNode(comp Component, fieldMap map[string]Field, compMap map[string]Component) ComponentNode {
 	node := ComponentNode{
-		Name:   comp.Name,
-		Fields: buildFieldNodes(comp.Fields, fieldMap),
+		Name:    comp.Name,
+		Fields:  buildFieldNodes(comp.Fields, fieldMap),
+		Entries: buildContainerNodes(comp.Entries, fieldMap, compMap),
 	}
 	for _, cref := range comp.Components {
 		if sub, ok := compMap[cref.Name]; ok {
@@ -186,6 +352,7 @@ func buildGroupNode(group Group, fieldMap map[string]Field, compMap map[string]C
 		Name:     group.Name,
 		Required: group.Required,
 		Fields:   buildFieldNodes(group.Fields, fieldMap),
+		Entries:  buildContainerNodes(group.Entries, fieldMap, compMap),
 	}
 	for _, cref := range group.Components {
 		if sub, ok := compMap[cref.Name]; ok {
@@ -204,6 +371,7 @@ func buildMessageNode(msg Message, fieldMap map[string]Field, compMap map[string
 		MsgType: msg.MsgType,
 		MsgCat:  msg.MsgCat,
 		Fields:  buildFieldNodes(msg.Fields, fieldMap),
+		Entries: buildContainerNodes(msg.Entries, fieldMap, compMap),
 	}
 	for _, cref := range msg.Components {
 		if sub, ok := compMap[cref.Name]; ok {

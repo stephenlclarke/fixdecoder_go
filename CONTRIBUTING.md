@@ -2,7 +2,9 @@
 
 ## Commit Message Guidelines (Conventional Commits)
 
-All commit messages **must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)** format:
+All commit messages **must follow the
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)**
+format:
 
 ```text
 <type>(<scope>): <short summary>

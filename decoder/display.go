@@ -25,6 +25,13 @@ import (
 
 var getTerminalSize = term.GetSize
 
+const (
+	tagWidth               = 4
+	nestIndent             = 4
+	entryFieldIndent       = tagWidth + 1
+	schemaGroupChildIndent = entryFieldIndent + 1
+)
+
 // findField returns the Field with the given number, or false if not found.
 func FindField(schema SchemaTree, tagID int) (Field, bool) {
 	for _, f := range schema.Fields {
@@ -37,7 +44,7 @@ func FindField(schema SchemaTree, tagID int) (Field, bool) {
 
 func printField(field FieldNode, indent int) {
 	printIndent(indent)
-	fmt.Printf("%-4d: %s (%s)%s\n",
+	fmt.Printf("%4d: %s (%s)%s\n",
 		field.Field.Number, field.Field.Name, field.Field.Type, formatRequired(field.Ref.Required),
 	)
 }
@@ -87,6 +94,15 @@ func printFields(msg MessageNode, verbose, column bool, indent int) {
 
 func printIndent(level int) {
 	fmt.Print(strings.Repeat(" ", level))
+}
+
+// componentHeaderIndent places component labels left of fields in the current container.
+func componentHeaderIndent(fieldIndent int) int {
+	if fieldIndent < entryFieldIndent {
+		return 0
+	}
+
+	return fieldIndent - entryFieldIndent
 }
 
 func printEnum(enum string, description string, indent int) {

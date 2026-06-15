@@ -37,7 +37,7 @@ func TestDisplayMessageStructureWithOptionsBasic(t *testing.T) {
 		DisplayMessageStructureWithOptions(schema, msg, false, false, false, false, 0)
 	})
 
-	want := "Message: Msg (T)\n"
+	want := "Message: Msg (T)\nMessage: Body\n"
 	if out != want {
 		t.Errorf("Basic: got %q; want %q", out, want)
 	}
@@ -56,7 +56,7 @@ func TestDisplayMessageStructureWithOptionsHeaderAndTrailer(t *testing.T) {
 		DisplayMessageStructureWithOptions(schema, msg, false, true, true, false, 2)
 	})
 
-	want := "Message: M (X)\n  Component: Header\n  Component: Trailer\n"
+	want := "Message: M (X)\n  Component: Header\n  Message: Body\n  Component: Trailer\n"
 	if out != want {
 		t.Errorf("Header+Trailer: got %q; want %q", out, want)
 	}
@@ -80,9 +80,10 @@ func TestDisplayMessageStructureWithOptionsFieldsAndComponentsAndGroups(t *testi
 
 	expectedLines := []string{
 		"Message: Msg (Z)",
-		" 1   : F1 (STRING)", // 1 space before 3 spaces after
-		" Component: Comp1",  // 1 space before
-		" Group: Grp1",       // 1 space before
+		" Message: Body",
+		"        1: F1 (STRING)",
+		"Component: Comp1",
+		"     Group: Grp1",
 	}
 
 	for _, want := range expectedLines {
@@ -116,7 +117,7 @@ func TestDisplayMessageStructureWithOptionsAllVerboseColumn(t *testing.T) {
 	expectedSnippets := []string{
 		"Message: Msg (Y)",
 		"Component: Header",
-		"2   : F2 (INT) - (Y)",
+		"       2: F2 (INT) - (Y)",
 		"A: Alpha",
 		"Component: Trailer",
 	}

@@ -33,7 +33,7 @@ func TestDisplayComponentBasic(t *testing.T) {
 		DisplayComponent(schema, MessageNode{}, comp, false, false, 0)
 	})
 
-	if want := "Component: Comp1\n    1   : F1 (STRING)\n"; out != want {
+	if want := "Component: Comp1\n       1: F1 (STRING)\n"; out != want {
 		t.Errorf("output = %q; want %q", out, want)
 	}
 }
