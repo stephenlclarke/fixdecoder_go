@@ -36,13 +36,13 @@ func writeTempFile(t *testing.T, name, contents string) string {
 func TestParseFlagsArgsSupportsOptionalValueWithoutEquals(t *testing.T) {
 	var errOut bytes.Buffer
 
-	opts, err := parseFlagsArgs([]string{"-message", "A"}, &errOut)
+	opts, err := parseFlagsArgs([]string{"--message", "A"}, &errOut)
 	if err != nil {
 		t.Fatalf("parseFlagsArgs() returned error: %v", err)
 	}
 
 	if !opts.Message.isSet || opts.Message.value != "A" {
-		t.Fatalf("expected -message A to set message A, got %+v", opts.Message)
+		t.Fatalf("expected --message A to set message A, got %+v", opts.Message)
 	}
 
 	if len(opts.FileArgs) != 1 || opts.FileArgs[0] != "-" {
@@ -55,7 +55,7 @@ func TestProcessUsesParsedPositionalArgs(t *testing.T) {
 
 	var out bytes.Buffer
 	var errOut bytes.Buffer
-	code := Process([]string{"-fix", "44", logPath}, &out, &errOut)
+	code := Process([]string{"--fix", "44", logPath}, &out, &errOut)
 
 	if code != 0 {
 		t.Fatalf(processSuccessFormat, code, errOut.String())
@@ -76,7 +76,7 @@ func TestProcessXMLUsesExternalDictionaryForPrettifyFiles(t *testing.T) {
 
 	var out bytes.Buffer
 	var errOut bytes.Buffer
-	code := Process([]string{"-xml", xmlPath, logPath}, &out, &errOut)
+	code := Process([]string{"--xml", xmlPath, logPath}, &out, &errOut)
 	if code != 0 {
 		t.Fatalf(processSuccessFormat, code, errOut.String())
 	}
@@ -90,7 +90,7 @@ func TestProcessReturnsNonZeroForUnknownFlag(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer
 
-	code := Process([]string{"-unknown"}, &out, &errOut)
+	code := Process([]string{"--unknown"}, &out, &errOut)
 	if code == 0 {
 		t.Fatalf("Process() = %d, want non-zero", code)
 	}
@@ -100,11 +100,33 @@ func TestProcessReturnsNonZeroForUnknownFlag(t *testing.T) {
 	}
 }
 
+func TestProcessRejectsSingleDashLongOptions(t *testing.T) {
+	for _, arg := range []string{"-info", "-version", "-help"} {
+		t.Run(arg, func(t *testing.T) {
+			var out bytes.Buffer
+			var errOut bytes.Buffer
+
+			code := Process([]string{arg}, &out, &errOut)
+			if code != 2 {
+				t.Fatalf("Process() = %d, want 2", code)
+			}
+
+			if !strings.Contains(errOut.String(), "must be written as --") {
+				t.Fatalf("expected long-option guidance on stderr, got %q", errOut.String())
+			}
+
+			if out.String() != "" {
+				t.Fatalf("expected no stdout output, got %q", out.String())
+			}
+		})
+	}
+}
+
 func TestProcessWarnsOnUnsupportedFixVersion(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer
 
-	code := Process([]string{"-fix=99", "-message=A"}, &out, &errOut)
+	code := Process([]string{"--fix=99", "--message=A"}, &out, &errOut)
 	if code != 0 {
 		t.Fatalf(processSuccessFormat, code, errOut.String())
 	}
@@ -115,5 +137,46 @@ func TestProcessWarnsOnUnsupportedFixVersion(t *testing.T) {
 
 	if !strings.Contains(out.String(), "Message:") {
 		t.Fatalf("expected handler output to be written to supplied writer, output=%q", out.String())
+	}
+}
+
+func TestProcessPrintsVersion(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := Process([]string{"--version"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf(processSuccessFormat, code, errOut.String())
+	}
+
+	if !strings.Contains(out.String(), "fixdecoder ") {
+		t.Fatalf("expected version output, got %q", out.String())
+	}
+
+	if errOut.String() != "" {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
+func TestProcessPrintsHelp(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"-h"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			var out bytes.Buffer
+			var errOut bytes.Buffer
+
+			code := Process(args, &out, &errOut)
+			if code != 0 {
+				t.Fatalf(processSuccessFormat, code, errOut.String())
+			}
+
+			help := errOut.String()
+			if !strings.Contains(help, "--help") || !strings.Contains(help, "--info") || !strings.Contains(help, "--version") {
+				t.Fatalf("expected GNU-style long flags in help output, got %q", help)
+			}
+
+			if out.String() != "" {
+				t.Fatalf("expected help output on stderr, got stdout=%q", out.String())
+			}
+		})
 	}
 }

@@ -34,7 +34,9 @@ var (
 	Sha     = "0000000"
 )
 
-// tagFlag supports optional string arg; bare -tag lists all, explicit -tag= shows usage, and -tag=NN selects a tag.
+var errSingleDashLongOption = errors.New("long options must start with --")
+
+// tagFlag supports optional string arg; bare --tag lists all, explicit --tag= shows usage, and --tag=NN selects a tag.
 type tagFlag struct {
 	value string
 	isSet bool
@@ -44,7 +46,7 @@ func (t *tagFlag) String() string     { return t.value }
 func (t *tagFlag) Set(s string) error { t.value, t.isSet = s, true; return nil }
 func (t *tagFlag) IsBoolFlag() bool   { return true }
 
-// componentFlag supports optional string arg; bare -component lists all, explicit -component= shows usage, and -component=NAME selects it.
+// componentFlag supports optional string arg; bare --component lists all, explicit --component= shows usage, and --component=NAME selects it.
 type componentFlag struct {
 	value string
 	isSet bool
@@ -77,9 +79,9 @@ type CLIOptions struct {
 	Message        messageFlag
 	Tag            tagFlag
 	Info           bool
+	Version        bool
 }
 
-// validateXMLFlag ensures the user supplied -xml=FILE syntax is correct.
 // parseFlagsArgs parses command-line arguments using a fresh FlagSet.
 func parseFlagsArgs(args []string, errOut io.Writer) (CLIOptions, error) {
 	var message messageFlag
@@ -98,11 +100,15 @@ func parseFlagsArgs(args []string, errOut io.Writer) (CLIOptions, error) {
 	fs.Var(&tag, "tag", "Tag number to display details for (omit to list all tags)")
 	columnOutput := fs.Bool("column", false, "Display enums in columns")
 	info := fs.Bool("info", false, "Show XML schema summary (fields, components, messages, version counts)")
+	version := fs.Bool("version", false, "Print version information and exit")
 
 	fs.Usage = func() {
 		PrintUsage(errOut)
-		fmt.Fprintln(errOut, "\nFlags:")
-		fs.PrintDefaults()
+		PrintFlagHelp(errOut)
+	}
+
+	if err := rejectSingleDashLongOptions(args, errOut); err != nil {
+		return CLIOptions{}, err
 	}
 
 	if err := fs.Parse(normalizeOptionalFlagArgs(args)); err != nil {
@@ -121,18 +127,56 @@ func parseFlagsArgs(args []string, errOut io.Writer) (CLIOptions, error) {
 		Message:        message,
 		Tag:            tag,
 		Info:           *info,
+		Version:        *version,
 	}, nil
 }
 
-// printUsage prints the program usage.
+// PrintVersion prints the program version and build metadata.
+func PrintVersion(out io.Writer) {
+	fmt.Fprintf(out, "fixdecoder %s (branch:%s, commit:%s)\n", Version, Branch, Sha)
+}
+
+// PrintUsage prints the program usage.
 func PrintUsage(out io.Writer) {
-	fmt.Fprintf(out, "fixdecoder %s (branch:%s, commit:%s)\n\n", Version, Branch, Sha)
+	PrintVersion(out)
+	fmt.Fprintln(out)
 	fmt.Fprintf(out, "  git clone %s\n\n", GitUrl)
-	fmt.Fprintln(out, "Usage: fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-message[=MSG] [-verbose] [-column] [-header] [-trailer]]")
-	fmt.Fprintln(out, "       fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-tag[=TAG] [-verbose] [-column]]")
-	fmt.Fprintln(out, "       fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-component=[NAME] [-verbose]]")
-	fmt.Fprintln(out, "       fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-info]")
+	fmt.Fprintln(out, "Usage: fixdecoder [[--fix=44] | [--xml FIX44.xml]] [--message[=MSG] [--verbose] [--column] [--header] [--trailer]]")
+	fmt.Fprintln(out, "       fixdecoder [[--fix=44] | [--xml FIX44.xml]] [--tag[=TAG] [--verbose] [--column]]")
+	fmt.Fprintln(out, "       fixdecoder [[--fix=44] | [--xml FIX44.xml]] [--component[=NAME] [--verbose]]")
+	fmt.Fprintln(out, "       fixdecoder [[--fix=44] | [--xml FIX44.xml]] [--info]")
+	fmt.Fprintln(out, "       fixdecoder [--help | -h]")
+	fmt.Fprintln(out, "       fixdecoder [--version]")
 	fmt.Fprintln(out, "       fixdecoder [file1.log file2.log ...]")
+}
+
+// PrintFlagHelp prints documented options with GNU-style long flag syntax.
+func PrintFlagHelp(out io.Writer) {
+	fmt.Fprintln(out, "\nFlags:")
+	fmt.Fprintln(out, "  --column")
+	fmt.Fprintln(out, "    Display enums in columns")
+	fmt.Fprintln(out, "  --component[=NAME]")
+	fmt.Fprintln(out, "    Component to display; omit NAME to list all components")
+	fmt.Fprintln(out, "  --fix=VERSION")
+	fmt.Fprintf(out, "    FIX version to use (%s)\n", fix.SupportedFixVersions())
+	fmt.Fprintln(out, "  --header")
+	fmt.Fprintln(out, "    Include Header block")
+	fmt.Fprintln(out, "  -h, --help")
+	fmt.Fprintln(out, "    Show this help message and exit")
+	fmt.Fprintln(out, "  --info")
+	fmt.Fprintln(out, "    Show XML schema summary")
+	fmt.Fprintln(out, "  --message[=MSG]")
+	fmt.Fprintln(out, "    Message name or MsgType; omit MSG to list all messages")
+	fmt.Fprintln(out, "  --tag[=TAG]")
+	fmt.Fprintln(out, "    Tag number to display details for; omit TAG to list all tags")
+	fmt.Fprintln(out, "  --trailer")
+	fmt.Fprintln(out, "    Include Trailer block")
+	fmt.Fprintln(out, "  --verbose")
+	fmt.Fprintln(out, "    Show full message structure with enums")
+	fmt.Fprintln(out, "  --version")
+	fmt.Fprintln(out, "    Print version information and exit")
+	fmt.Fprintln(out, "  --xml=FILE")
+	fmt.Fprintln(out, "    Path to alternative FIX XML file")
 }
 
 // loadSchema reads and parses the FIX XML into a SchemaTree.
@@ -170,7 +214,7 @@ func normalizeOptionalFlagArgs(args []string) []string {
 			break
 		}
 
-		if (arg == "-message" || arg == "-tag" || arg == "-component") &&
+		if isOptionalValueFlag(arg) &&
 			i+1 < len(args) &&
 			!strings.HasPrefix(args[i+1], "-") {
 			normalized = append(normalized, arg+"="+args[i+1])
@@ -182,6 +226,34 @@ func normalizeOptionalFlagArgs(args []string) []string {
 	}
 
 	return normalized
+}
+
+// rejectSingleDashLongOptions keeps the Go CLI aligned with the Rust/Java GNU-style long options.
+func rejectSingleDashLongOptions(args []string, errOut io.Writer) error {
+	for _, arg := range args {
+		if arg == "--" {
+			return nil
+		}
+		if !strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "--") || arg == "-" || arg == "-h" {
+			continue
+		}
+
+		optionName := strings.TrimPrefix(arg, "-")
+		if beforeEquals, _, found := strings.Cut(optionName, "="); found {
+			optionName = beforeEquals
+		}
+
+		fmt.Fprintf(errOut, "long option -%s must be written as --%s\n", optionName, optionName)
+		return errSingleDashLongOption
+	}
+
+	return nil
+}
+
+func isOptionalValueFlag(arg string) bool {
+	return arg == "--message" ||
+		arg == "--tag" ||
+		arg == "--component"
 }
 
 func fileArgsOrStdin(args []string) []string {
@@ -201,6 +273,11 @@ func Process(args []string, out, errOut io.Writer) int {
 		}
 
 		return 2
+	}
+
+	if opts.Version {
+		PrintVersion(out)
+		return 0
 	}
 
 	if opts.XMLPath == "" && !fix.IsSupportedFixVersion(opts.FixVersion) {

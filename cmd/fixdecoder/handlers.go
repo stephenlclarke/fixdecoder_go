@@ -73,16 +73,16 @@ func handleInfo(opts CLIOptions, schema decoder.SchemaTree, out io.Writer) bool 
 	return true
 }
 
-// handleMessage processes the -message flag. Returns true if handled.
+// handleMessage processes the --message flag. Returns true if handled.
 func handleMessage(opts CLIOptions, schema decoder.SchemaTree, out io.Writer) bool {
 	if !opts.Message.isSet {
 		return false
 	}
 
 	switch opts.Message.value {
-	case "true": // bare -message
+	case "true": // bare --message
 		handleBareMessage(schema, opts.ColumnOutput, out)
-	case "": // explicit -message=
+	case "": // explicit --message=
 		PrintUsage(out)
 	default:
 		handleSpecificMessage(opts, schema, out)
@@ -133,16 +133,16 @@ func findMessage(schema decoder.SchemaTree, query string) (decoder.MessageNode, 
 	return decoder.MessageNode{}, false
 }
 
-// handleTag processes the -tag flag. Returns true if handled.
+// handleTag processes the --tag flag. Returns true if handled.
 func handleTag(opts CLIOptions, schema decoder.SchemaTree, out io.Writer) bool {
 	if !opts.Tag.isSet {
 		return false
 	}
 
 	switch opts.Tag.value {
-	case "true": // bare -tag
+	case "true": // bare --tag
 		handleBareTag(opts, schema, out)
-	case "": // explicit -tag=
+	case "": // explicit --tag=
 		PrintUsage(out)
 	default:
 		handleSpecificTag(opts, schema, out)
@@ -178,16 +178,16 @@ func handleSpecificTag(opts CLIOptions, schema decoder.SchemaTree, out io.Writer
 	})
 }
 
-// handleComponent processes the -component flag. Returns true if handled.
+// handleComponent processes the --component flag. Returns true if handled.
 func handleComponent(opts CLIOptions, schema decoder.SchemaTree, out io.Writer) bool {
 	if !opts.Component.isSet {
 		return false
 	}
 
 	switch opts.Component.value {
-	case "true": // bare -component
+	case "true": // bare --component
 		handleBareComponent(opts, schema, out)
-	case "": // explicit -component=
+	case "": // explicit --component=
 		PrintUsage(out)
 	default:
 		handleSpecificComponent(opts, schema, out)
@@ -222,7 +222,7 @@ func handleSpecificComponent(opts CLIOptions, schema decoder.SchemaTree, out io.
 	}
 }
 
-// runHandlers invokes each of the "-info", "-message", "-tag", and "-component" handlers.
+// runHandlers invokes each of the "--info", "--message", "--tag", and "--component" handlers.
 // It returns true if any handler succeeded.
 func runHandlers(opts CLIOptions, schema decoder.SchemaTree, out io.Writer) bool {
 	handled := false

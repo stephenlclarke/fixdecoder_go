@@ -47,7 +47,7 @@ I have written utilities like this in past in [Java](https://github.com/stephenl
 
 ## What is it
 
-fixdecoder is a FIX-aware logfile prettifier and dictionary explorer. It reads stdin or one or more log files, detects FIX messages in each line, prints the original line, and follows it with a colourised tag breakdown using embedded FIX dictionaries or a supplied QuickFIX XML dictionary. For lookup work, `-info`, `-message`, `-component`, and `-tag` inspect the selected FIX version without decoding a log stream.
+fixdecoder is a FIX-aware logfile prettifier and dictionary explorer. It reads stdin or one or more log files, detects FIX messages in each line, prints the original line, and follows it with a colourised tag breakdown using embedded FIX dictionaries or a supplied QuickFIX XML dictionary. For lookup work, `--info`, `--message`, `--component`, and `--tag` inspect the selected FIX version without decoding a log stream.
 
 This Go implementation is intentionally simpler than the [Rust](https://github.com/stephenlclarke/fixdecoder_rs) and [Java](https://github.com/stephenlclarke/fixdecoder_java) repos. It focuses on fast native builds, embedded dictionary lookup, command-line dictionary browsing, and straightforward logfile prettification.
 
@@ -63,27 +63,29 @@ cat fixlog.txt | scripts/fixdecoder
 scripts/fixdecoder logs/fix.log logs/fix2.log
 
 # Browse dictionary definitions
-scripts/fixdecoder -fix=44 -message=D -verbose -column -header -trailer
+scripts/fixdecoder --fix=44 --message=D --verbose --column --header --trailer
 ```
 
 ## Running the fixdecoder utility
 
-You can run fixdecoder anywhere you can run a Go binary. The standard build embeds FIX dictionaries for FIX 4.0 through FIX 5.0 SP2 plus FIXT 1.1, and `-xml` can point at an alternative QuickFIX XML file for custom dictionaries.
+You can run fixdecoder anywhere you can run a Go binary. The standard build embeds FIX dictionaries for FIX 4.0 through FIX 5.0 SP2 plus FIXT 1.1, and `--xml` can point at an alternative QuickFIX XML file for custom dictionaries.
 
 From a source checkout, `scripts/fixdecoder` runs the local `bin/fixdecoder` produced by `make build`; set `FIXDECODER_BIN=/path/to/fixdecoder` to override discovery.
 
 ```text
-fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-message[=MSG] [-verbose] [-column] [-header] [-trailer]]
-fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-tag[=TAG] [-verbose] [-column]]
-fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-component=[NAME] [-verbose]]
-fixdecoder [[-fix=44] | [-xml FIX44.xml]] [-info]
+fixdecoder [[--fix=44] | [--xml FIX44.xml]] [--message[=MSG] [--verbose] [--column] [--header] [--trailer]]
+fixdecoder [[--fix=44] | [--xml FIX44.xml]] [--tag[=TAG] [--verbose] [--column]]
+fixdecoder [[--fix=44] | [--xml FIX44.xml]] [--component[=NAME] [--verbose]]
+fixdecoder [[--fix=44] | [--xml FIX44.xml]] [--info]
+fixdecoder [--help | -h]
+fixdecoder [--version]
 fixdecoder [file1.log file2.log ...]
 ```
 
 ## Key options at a glance
 
-- Dictionaries: `-xml`, `-fix`, `-info`, `-message`, `-component`, `-tag`
-- Output/layout: `-column`, `-verbose`, `-header`, `-trailer`
+- Dictionaries: `--xml`, `--fix`, `--info`, `--message`, `--component`, `--tag`
+- Output/layout: `--column`, `--verbose`, `--header`, `--trailer`
 - Input: one or more log files, or stdin when no file is supplied
 
 ## Examples
@@ -108,7 +110,7 @@ Processing: (stdin)
 ### Inspect a message
 
 ```bash
-$ scripts/fixdecoder -fix=44 -message=D -header -trailer
+$ scripts/fixdecoder --fix=44 --message=D --header --trailer
 Message: NewOrderSingle (D)
     Component: Header
            8: BeginString (STRING) - (Y)
@@ -128,7 +130,7 @@ Message: NewOrderSingle (D)
 ### Inspect a tag
 
 ```bash
-$ scripts/fixdecoder -fix=44 -tag=35 -verbose
+$ scripts/fixdecoder --fix=44 --tag=35 --verbose
   35: MsgType (STRING)
        0 : HEARTBEAT
        1 : TEST_REQUEST

@@ -90,7 +90,7 @@ func TestBinaryUsesExternalXMLForPrettify(t *testing.T) {
 	xmlPath := writeIntegrationTempFile(t, "schema.xml", `<fix major="4" minor="4"><fields><field number="35" name="ExternalMsgType"><value enum="A" description="ExternalLogon"/></field></fields><messages></messages><components></components><header></header><trailer></trailer></fix>`)
 	logPath := writeIntegrationTempFile(t, "fix.log", "8=FIX.4.4\x0135=A\x0110=123\x01\n")
 
-	stdout, stderr := runBinary(t, binary, "-xml", xmlPath, logPath)
+	stdout, stderr := runBinary(t, binary, "--xml", xmlPath, logPath)
 
 	if !strings.Contains(stdout, "ExternalMsgType") || !strings.Contains(stdout, "ExternalLogon") {
 		t.Fatalf("expected binary output to use external XML lookup, stdout=%q", stdout)
@@ -105,7 +105,7 @@ func TestBinaryInfoReportsExternalDictionary(t *testing.T) {
 	binary := buildBinary(t)
 	xmlPath := writeIntegrationTempFile(t, "schema.xml", `<fix major="4" minor="4"><fields><field number="35" name="MsgType"/></fields><messages></messages><components></components><header></header><trailer></trailer></fix>`)
 
-	stdout, stderr := runBinary(t, binary, "-xml", xmlPath, "-info")
+	stdout, stderr := runBinary(t, binary, "--xml", xmlPath, "--info")
 
 	if !strings.Contains(stdout, "Dictionary loaded from:") || !strings.Contains(stdout, "Current Schema:") {
 		t.Fatalf("expected schema summary output, stdout=%q", stdout)
