@@ -17,11 +17,18 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
 
-const testTagHeader = "42  : TestTag (STRING)\n"
+const testTagHeader = "  42: TestTag (STRING)\n"
+
+var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(text string) string {
+	return ansiPattern.ReplaceAllString(text, "")
+}
 
 func TestPrintTagDetailsAllBranches(t *testing.T) {
 	field := Field{
@@ -35,9 +42,9 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 	}
 
 	// 1. Not verbose: only header printed
-	out := captureStdout(func() {
+	out := stripANSI(captureStdout(func() {
 		PrintTagDetails(field, false, false)
-	})
+	}))
 
 	want := testTagHeader
 	if out != want {
@@ -45,11 +52,11 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 	}
 
 	// 2. Verbose, column = false: prints each value using printEnum
-	out = captureStdout(func() {
+	out = stripANSI(captureStdout(func() {
 		PrintTagDetails(field, true, false)
-	})
+	}))
 
-	if !strings.Contains(out, "  A : Apple") || !strings.Contains(out, "  B : Banana") {
+	if !strings.Contains(out, "      A : Apple") || !strings.Contains(out, "      B : Banana") {
 		t.Errorf("verbose no-column: missing values, got %q", out)
 	}
 
@@ -59,27 +66,52 @@ func TestPrintTagDetailsAllBranches(t *testing.T) {
 
 	// 3. Verbose, column = true: triggers printEnumColumns
 	// (output comes from printEnumColumns)
-	out = captureStdout(func() {
+	out = stripANSI(captureStdout(func() {
 		PrintTagDetails(field, true, true)
-	})
+	}))
 
 	// The output will include both values, and the header.
 	if !strings.Contains(out, testTagHeader) {
 		t.Errorf("verbose column: missing header, got %q", out)
 	}
 
-	if !strings.Contains(out, "    A: Apple   B: Banana  \n") {
+	if !strings.Contains(out, "      A : Apple") || !strings.Contains(out, "B : Banana") {
 		t.Errorf("verbose column: missing value strings, got %q", out)
 	}
 
 	// 4. Empty Values: only header, nothing else (with verbose)
 	emptyField := Field{Number: 7, Name: "NoEnums", Type: "INT", Values: nil}
-	out = captureStdout(func() {
+	out = stripANSI(captureStdout(func() {
 		PrintTagDetails(emptyField, true, false)
-	})
+	}))
 
-	if out != "7   : NoEnums (INT)\n" {
+	if out != "   7: NoEnums (INT)\n" {
 		t.Errorf("empty values: got %q, want header only", out)
+	}
+}
+
+func TestPrintTagDetailsAlignsLongEnumCodes(t *testing.T) {
+	field := Field{
+		Number: 35,
+		Name:   "MsgType",
+		Type:   "STRING",
+		Values: []Value{
+			{Enum: "A", Description: "Apple"},
+			{Enum: "LONG", Description: "LongCode"},
+		},
+	}
+
+	out := stripANSI(captureStdout(func() {
+		PrintTagDetails(field, true, false)
+	}))
+
+	want := strings.Join([]string{
+		"  35: MsgType (STRING)",
+		"         A : Apple",
+		"      LONG : LongCode",
+	}, "\n")
+	if !strings.Contains(out, want) {
+		t.Errorf("long enum codes should define the enum column width, got %q", out)
 	}
 }
 
@@ -105,11 +137,11 @@ func TestListAllTags(t *testing.T) {
 	os.Stdout = orig
 	io.Copy(&buf, r)
 
-	output := buf.String()
+	output := stripANSI(buf.String())
 
-	expected := "1   : Account (STRING)\n" +
-		"11  : ClOrdID (STRING)\n" +
-		"37  : OrderID (STRING)\n"
+	expected := "   1: Account (STRING)\n" +
+		"  11: ClOrdID (STRING)\n" +
+		"  37: OrderID (STRING)\n"
 
 	if output != expected {
 		t.Errorf("Unexpected output:\nGot:\n%s\nWant:\n%s", output, expected)
@@ -135,9 +167,9 @@ func TestPrintTagsInColumns(t *testing.T) {
 	PrintTagsInColumns(schema)
 
 	want := []string{
-		"1   : Account (STRING)",
-		"11  : ClOrdID (STRING)",
-		"37  : OrderID (STRING)",
+		"   1: Account (STRING)",
+		"  11: ClOrdID (STRING)",
+		"  37: OrderID (STRING)",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Unexpected column output.\nGot:  %#v\nWant: %#v", got, want)

@@ -118,7 +118,7 @@ func TestDisplayMessageStructureWithOptionsAllVerboseColumn(t *testing.T) {
 		"Message: Msg (Y)",
 		"Component: Header",
 		"       2: F2 (INT) - (Y)",
-		"A: Alpha",
+		"A : Alpha",
 		"Component: Trailer",
 	}
 

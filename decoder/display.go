@@ -16,7 +16,6 @@ package decoder
 import (
 	"fmt"
 	"os"
-	"sort"
 
 	"strings"
 
@@ -133,12 +132,14 @@ func printEnumColumns(values []Value, indent int) {
 		usableWidth = width
 	}
 
-	maxLen := 0
-	for _, v := range values {
-		l := len(v.Enum) + 2 + len(v.Description)
+	sorted := sortedEnumValues(values)
+	enumWidth := maxEnumWidth(sorted)
 
-		if l > maxLen {
-			maxLen = l
+	maxLen := 0
+	for _, value := range sorted {
+		textWidth := len(tagEnumText(value, enumWidth))
+		if textWidth > maxLen {
+			maxLen = textWidth
 		}
 	}
 
@@ -147,11 +148,7 @@ func printEnumColumns(values []Value, indent int) {
 		cols = 1
 	}
 
-	rows := (len(values) + cols - 1) / cols
-
-	sort.Slice(values, func(i, j int) bool {
-		return values[i].Enum < values[j].Enum
-	})
+	rows := (len(sorted) + cols - 1) / cols
 
 	for r := range rows {
 		printIndent(indent)
@@ -159,8 +156,8 @@ func printEnumColumns(values []Value, indent int) {
 		for c := range cols {
 			i := c*rows + r
 
-			if i < len(values) {
-				s := fmt.Sprintf("%s: %s", values[i].Enum, values[i].Description)
+			if i < len(sorted) {
+				s := tagEnumText(sorted[i], enumWidth)
 				fmt.Printf("%-*s", maxLen+2, s)
 			}
 		}

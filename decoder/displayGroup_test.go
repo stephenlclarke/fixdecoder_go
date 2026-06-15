@@ -68,7 +68,7 @@ func TestDisplayGroupVerboseColumn(t *testing.T) {
 	got := captureStdout(func() {
 		DisplayGroup(SchemaTree{}, group, true, true, 0)
 	})
-	if !bytes.Contains([]byte(got), []byte("C: Charlie")) {
+	if !bytes.Contains([]byte(got), []byte("C : Charlie")) {
 		t.Errorf("expected column enum output, got: %q", got)
 	}
 }

@@ -152,8 +152,16 @@ func printEnums(f FieldNode, msg MessageNode, columnOutput bool, indent int) {
 	if columnOutput {
 		printEnumColumns(f.Field.Values, indent)
 	} else {
-		for _, v := range f.Field.Values {
-			printEnumFunc(v.Enum, v.Description, indent)
+		sorted := sortedEnumValues(f.Field.Values)
+		enumWidth := maxEnumWidth(sorted)
+		for _, value := range sorted {
+			printAlignedEnum(value, indent, enumWidth)
 		}
 	}
+}
+
+// printAlignedEnum prints an enum value using the shared dynamic-width enum layout.
+func printAlignedEnum(value Value, indent int, enumWidth int) {
+	printIndent(indent + 4)
+	fmt.Println(tagEnumText(value, enumWidth))
 }

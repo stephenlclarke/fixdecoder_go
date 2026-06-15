@@ -60,8 +60,8 @@ func TestPrintEnumColumnsTermSizeError(t *testing.T) {
 	out := captureStdout(func() {
 		printEnumColumns(values, 0)
 	})
-	if !strings.Contains(out, "X: Y") {
-		t.Errorf("expected printed enum \"X: Y\", got %q", out)
+	if !strings.Contains(out, "X : Y") {
+		t.Errorf("expected printed enum \"X : Y\", got %q", out)
 	}
 }
 
@@ -77,7 +77,7 @@ func TestPrintEnumColumnsZeroCols(t *testing.T) {
 		printEnumColumns(values, 80) // usableWidth = 80-80 = 0 → reset to 80; maxLen+2 > 80 → cols = 0 → cols=1
 	})
 	// Should still print our single enum on one line
-	if !strings.Contains(out, "E: "+longDesc) {
+	if !strings.Contains(out, "E : "+longDesc) {
 		t.Errorf("expected printed enum with long description, got %q", out)
 	}
 	// And exactly one line (plus newline)
@@ -149,7 +149,7 @@ func TestPrintFieldsVerboseColumn(t *testing.T) {
 	})
 
 	// Should contain all enum values in one or more columns
-	expects := []string{"EV1: Desc1", "EV2: Desc2", "EVA: DescA", "EVB: DescB"}
+	expects := []string{"EV1 : Desc1", "EV2 : Desc2", "EVA : DescA", "EVB : DescB"}
 	for _, exp := range expects {
 		if !strings.Contains(output, exp) {
 			t.Errorf("expected column output %q; got %q", exp, output)

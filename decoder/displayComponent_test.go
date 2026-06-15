@@ -55,7 +55,7 @@ func TestDisplayComponentVerboseColumn(t *testing.T) {
 	})
 
 	// Look for column output
-	if !bytes.Contains([]byte(out), []byte("A: Alpha")) || !bytes.Contains([]byte(out), []byte("B: Beta")) {
+	if !bytes.Contains([]byte(out), []byte("A : Alpha")) || !bytes.Contains([]byte(out), []byte("B : Beta")) {
 		t.Errorf("Missing column enums in output: %q", out)
 	}
 }
