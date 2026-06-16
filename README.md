@@ -15,7 +15,7 @@
 [![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=stephenlclarke_fixdecoder_go&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=stephenlclarke_fixdecoder_go)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=stephenlclarke_fixdecoder_go&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=stephenlclarke_fixdecoder_go)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=stephenlclarke_fixdecoder_go&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=stephenlclarke_fixdecoder_go)
-![Repo Visitors](https://visitor-badge.laobi.icu/badge?page_id=stephenlclarke.fixdecoder_go)
+![Repo Traffic](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fstephenlclarke%2Ffixdecoder_go%2Fmain%2F.badges%2Ftraffic.json&cacheSeconds=3600)
 
 ---
 
@@ -413,6 +413,10 @@ The FIX dictionary Go source is regenerated from the XML resources with:
 ```bash
 ./resources/generate_fix_go.sh
 ```
+
+## Repository traffic badge
+
+The public traffic badge is generated from GitHub Insights by `.github/workflows/traffic-badge.yml`. Configure a repository secret named `TRAFFIC_TOKEN` that can call the repository traffic API; for a fine-grained personal access token, grant Repository permissions > Administration: read. The scheduled workflow publishes only the aggregate 14-day unique visitor and view counts to `.badges/traffic.json`.
 
 ## Related implementations
 
