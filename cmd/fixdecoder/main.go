@@ -102,6 +102,7 @@ func parseFlagsArgs(args []string, errOut io.Writer) (CLIOptions, error) {
 	columnOutput := fs.Bool("column", false, "Display enums in columns")
 	info := fs.Bool("info", false, "Show XML schema summary (fields, components, messages, version counts)")
 	version := fs.Bool("version", false, "Print version information and exit")
+	versionShort := fs.Bool("v", false, "Print version information and exit")
 
 	fs.Usage = func() {
 		PrintUsage(errOut)
@@ -127,7 +128,7 @@ func parseFlagsArgs(args []string, errOut io.Writer) (CLIOptions, error) {
 		Message:        message,
 		Tag:            tag,
 		Info:           *info,
-		Version:        *version,
+		Version:        *version || *versionShort,
 	}, nil
 }
 
@@ -202,7 +203,7 @@ func rejectSingleDashLongOptions(args []string, errOut io.Writer) error {
 		if arg == "--" {
 			return nil
 		}
-		if !strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "--") || arg == "-" || arg == "-h" {
+		if !strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "--") || arg == "-" || arg == "-h" || arg == "-v" {
 			continue
 		}
 

@@ -141,20 +141,24 @@ func TestProcessWarnsOnUnsupportedFixVersion(t *testing.T) {
 }
 
 func TestProcessPrintsVersion(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
+	for _, arg := range []string{"--version", "-v"} {
+		t.Run(arg, func(t *testing.T) {
+			var out bytes.Buffer
+			var errOut bytes.Buffer
 
-	code := Process([]string{"--version"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf(processSuccessFormat, code, errOut.String())
-	}
+			code := Process([]string{arg}, &out, &errOut)
+			if code != 0 {
+				t.Fatalf(processSuccessFormat, code, errOut.String())
+			}
 
-	if !strings.Contains(out.String(), "fixdecoder ") {
-		t.Fatalf("expected version output, got %q", out.String())
-	}
+			if !strings.Contains(out.String(), "fixdecoder ") {
+				t.Fatalf("expected version output, got %q", out.String())
+			}
 
-	if errOut.String() != "" {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+			if errOut.String() != "" {
+				t.Fatalf("expected no stderr output, got %q", errOut.String())
+			}
+		})
 	}
 }
 
@@ -170,7 +174,7 @@ func TestProcessPrintsHelp(t *testing.T) {
 			}
 
 			help := errOut.String()
-			if !strings.Contains(help, "--help") || !strings.Contains(help, "--info") || !strings.Contains(help, "--version") {
+			if !strings.Contains(help, "-h, --help") || !strings.Contains(help, "--info") || !strings.Contains(help, "-v, --version") {
 				t.Fatalf("expected GNU-style long flags in help output, got %q", help)
 			}
 			if !strings.Contains(help, "Command line option examples:") {

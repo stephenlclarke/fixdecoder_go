@@ -1,6 +1,6 @@
 Usage: fixdecoder [--xml=FILE] [--fix=VERSION] [--info] [--message[=MSG]]
        [--component[=NAME]] [--tag[=TAG]] [--column] [--verbose] [--header]
-       [--trailer] [-h|--help] [--version] [file1.log file2.log ...]
+       [--trailer] [-h|--help] [-v|--version] [file1.log file2.log ...]
 
 Pretty-print FIX log messages and inspect FIX dictionaries.
 
@@ -9,30 +9,18 @@ Arguments:
       FIX log files, or stdin when omitted.
 
 Options:
-  --xml=FILE
-      Path to alternative FIX XML file.
-  --fix=VERSION
-      FIX version to use.
-  --info
-      Show XML schema summary.
-  --message[=MSG]
-      Message name or MsgType; omit the value to list all messages.
-  --component[=NAME]
-      Component to display; omit the value to list all components.
-  --tag[=TAG]
-      Tag number to display details for; omit the value to list all tags.
-  --column
-      Display enum values in columns.
-  --verbose
-      Show full message structure with enums.
-  --header
-      Include the Header block.
-  --trailer
-      Include the Trailer block.
-  -h, --help
-      Show this help message and exit.
-  --version
-      Print version information and exit.
+  --xml=FILE               Path to alternative FIX XML file.
+  --fix=VERSION            FIX version to use.
+  --info                   Show XML schema summary.
+  --message[=MSG]          Message name or MsgType; omit the value to list all messages.
+  --component[=NAME]       Component to display; omit the value to list all components.
+  --tag[=TAG]              Tag number to display details for; omit the value to list all tags.
+  --column                 Display enum values in columns.
+  --verbose                Show full message structure with enums.
+  --header                 Include the Header block.
+  --trailer                Include the Trailer block.
+  -h, --help               Show this help message and exit.
+  -v, --version            Print version information and exit.
 
 Command line option examples:
 
