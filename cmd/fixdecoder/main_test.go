@@ -173,10 +173,39 @@ func TestProcessPrintsHelp(t *testing.T) {
 			if !strings.Contains(help, "--help") || !strings.Contains(help, "--info") || !strings.Contains(help, "--version") {
 				t.Fatalf("expected GNU-style long flags in help output, got %q", help)
 			}
+			assertOptionOrder(
+				t,
+				help,
+				"--xml",
+				"--fix",
+				"--info",
+				"--message",
+				"--component",
+				"--tag",
+				"--column",
+				"--verbose",
+				"--header",
+				"--trailer",
+				"--help",
+				"--version",
+			)
 
 			if out.String() != "" {
 				t.Fatalf("expected help output on stderr, got stdout=%q", out.String())
 			}
 		})
+	}
+}
+
+func assertOptionOrder(t *testing.T, help string, options ...string) {
+	t.Helper()
+
+	cursor := 0
+	for _, option := range options {
+		found := strings.Index(help[cursor:], option)
+		if found < 0 {
+			t.Fatalf("missing %s in help output:\n%s", option, help)
+		}
+		cursor += found + len(option)
 	}
 }
