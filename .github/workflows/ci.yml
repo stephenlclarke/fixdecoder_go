@@ -1,3 +1,5 @@
+---
+# yamllint disable rule:truthy rule:line-length
 # SPDX-License-Identifier: AGPL-3.0-only
 # SPDX-FileCopyrightText: 2026 Steve Clarke <stephenlclarke@mac.com> - https://xyzzy.tools
 #
@@ -103,6 +105,7 @@ jobs:
           name: unit-test-reports
           path: |
             reports/coverage.out
+            reports/test-report-*.xml
             reports/unit-test-report.xml
           if-no-files-found: error
 
@@ -142,12 +145,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: unit-test-reports
-          path: .
+          path: reports
       - name: Download integration coverage
         uses: actions/download-artifact@v4
         with:
           name: integration-reports
-          path: .
+          path: reports
+      - name: Verify Sonar reports
+        run: |
+          test -s reports/coverage.out
+          test -s reports/coverage.integration.out
+          test -s reports/unit-test-report.xml
       - name: Run Sonar scan when configured
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
