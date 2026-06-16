@@ -24,6 +24,7 @@ import (
 
 	"github.com/stephenlclarke/fixdecoder_go/decoder"
 	"github.com/stephenlclarke/fixdecoder_go/fix"
+	appresources "github.com/stephenlclarke/fixdecoder_go/resources"
 )
 
 // Version, Branch, GitUrl, Sha are injected at build time via -ldflags
@@ -104,7 +105,6 @@ func parseFlagsArgs(args []string, errOut io.Writer) (CLIOptions, error) {
 
 	fs.Usage = func() {
 		PrintUsage(errOut)
-		PrintFlagHelp(errOut)
 	}
 
 	if err := rejectSingleDashLongOptions(args, errOut); err != nil {
@@ -141,38 +141,10 @@ func PrintUsage(out io.Writer) {
 	PrintVersion(out)
 	fmt.Fprintln(out)
 	fmt.Fprintf(out, "  git clone %s\n\n", GitUrl)
-	fmt.Fprintln(out, "Usage: fixdecoder [--xml=FILE] [--fix=VERSION] [--info] [--message[=MSG]]")
-	fmt.Fprintln(out, "       [--component[=NAME]] [--tag[=TAG]] [--column] [--verbose] [--header]")
-	fmt.Fprintln(out, "       [--trailer] [--help | -h] [--version] [file1.log file2.log ...]")
-}
-
-// PrintFlagHelp prints documented options with GNU-style long flag syntax.
-func PrintFlagHelp(out io.Writer) {
-	fmt.Fprintln(out, "\nFlags:")
-	fmt.Fprintln(out, "  --xml=FILE")
-	fmt.Fprintln(out, "    Path to alternative FIX XML file")
-	fmt.Fprintln(out, "  --fix=VERSION")
-	fmt.Fprintf(out, "    FIX version to use (%s)\n", fix.SupportedFixVersions())
-	fmt.Fprintln(out, "  --info")
-	fmt.Fprintln(out, "    Show XML schema summary")
-	fmt.Fprintln(out, "  --message[=MSG]")
-	fmt.Fprintln(out, "    Message name or MsgType; omit MSG to list all messages")
-	fmt.Fprintln(out, "  --component[=NAME]")
-	fmt.Fprintln(out, "    Component to display; omit NAME to list all components")
-	fmt.Fprintln(out, "  --tag[=TAG]")
-	fmt.Fprintln(out, "    Tag number to display details for; omit TAG to list all tags")
-	fmt.Fprintln(out, "  --column")
-	fmt.Fprintln(out, "    Display enums in columns")
-	fmt.Fprintln(out, "  --verbose")
-	fmt.Fprintln(out, "    Show full message structure with enums")
-	fmt.Fprintln(out, "  --header")
-	fmt.Fprintln(out, "    Include Header block")
-	fmt.Fprintln(out, "  --trailer")
-	fmt.Fprintln(out, "    Include Trailer block")
-	fmt.Fprintln(out, "  -h, --help")
-	fmt.Fprintln(out, "    Show this help message and exit")
-	fmt.Fprintln(out, "  --version")
-	fmt.Fprintln(out, "    Print version information and exit")
+	fmt.Fprint(out, appresources.UsageText)
+	if !strings.HasSuffix(appresources.UsageText, "\n") {
+		fmt.Fprintln(out)
+	}
 }
 
 // loadSchema reads and parses the FIX XML into a SchemaTree.

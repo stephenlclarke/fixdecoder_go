@@ -173,6 +173,9 @@ func TestProcessPrintsHelp(t *testing.T) {
 			if !strings.Contains(help, "--help") || !strings.Contains(help, "--info") || !strings.Contains(help, "--version") {
 				t.Fatalf("expected GNU-style long flags in help output, got %q", help)
 			}
+			if !strings.Contains(help, "Command line option examples:") {
+				t.Fatalf("expected resource-backed examples in help output, got %q", help)
+			}
 			assertOptionOrder(
 				t,
 				help,
