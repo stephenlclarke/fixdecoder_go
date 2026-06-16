@@ -154,6 +154,9 @@ func TestProcessPrintsVersion(t *testing.T) {
 			if !strings.Contains(out.String(), "fixdecoder ") {
 				t.Fatalf("expected version output, got %q", out.String())
 			}
+			if !strings.Contains(out.String(), " [go:go") {
+				t.Fatalf("expected Go runtime in version output, got %q", out.String())
+			}
 
 			if errOut.String() != "" {
 				t.Fatalf("expected no stderr output, got %q", errOut.String())

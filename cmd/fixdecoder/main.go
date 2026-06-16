@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/stephenlclarke/fixdecoder_go/decoder"
@@ -134,7 +135,7 @@ func parseFlagsArgs(args []string, errOut io.Writer) (CLIOptions, error) {
 
 // PrintVersion prints the program version and build metadata.
 func PrintVersion(out io.Writer) {
-	fmt.Fprintf(out, "fixdecoder %s (branch:%s, commit:%s)\n", Version, Branch, Sha)
+	fmt.Fprintf(out, "fixdecoder %s (branch:%s, commit:%s) [go:%s]\n", Version, Branch, Sha, runtime.Version())
 }
 
 // PrintUsage prints the program usage.
